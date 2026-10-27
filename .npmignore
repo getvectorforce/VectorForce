@@ -1,0 +1,11 @@
+node_modules/
+.git/
+.vectorforce/
+tmp/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+studio/node_modules/
+studio/src/
+!studio/dist/

@@ -1,0 +1,40 @@
+{
+  "name": "vectorforce",
+  "version": "0.1.0",
+  "description": "Portable engineering context platform - Git for AI context",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "vf": "./bin/vf.js"
+  },
+  "scripts": {
+    "test": "node --test test/**/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "files": [
+    "bin",
+    "src",
+    "studio/dist",
+    "AGENTS.md",
+    "commandcode.json",
+    "musecode.json",
+    "codex.json",
+    ".agents",
+    ".codex"
+  ],
+  "keywords": [
+    "context",
+    "checkpoints",
+    "mcp",
+    "antigravity",
+    "command-code",
+    "codex",
+    "ai-agents",
+    "reasoning",
+    "llama"
+  ],
+  "author": "",
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "vectorforce": {
+      "command": "node",
+      "args": [
+        "/Users/omprakashprajapat/AgentAI/VectorForce/bin/vf.js",
+        "mcp",
+        "--workspace",
+        "/Users/omprakashprajapat/AgentAI/VectorForce"
+      ],
+      "env": {
+        "VF_WORKSPACE": "/Users/omprakashprajapat/AgentAI/VectorForce",
+        "VF_DB_PATH": "/Users/omprakashprajapat/AgentAI/VectorForce/.vectorforce/vectorforce.db"
+      }
+    }
+  }
+}

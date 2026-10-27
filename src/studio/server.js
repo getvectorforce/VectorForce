@@ -1,0 +1,456 @@
+import { createServer } from 'node:http';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { SqliteStore } from '../storage/sqlite-store.js';
+import { ProjectService } from '../operations/project-service.js';
+import { CheckpointService } from '../operations/checkpoint-service.js';
+import { BriefingService } from '../operations/briefing-service.js';
+import { HandoffService } from '../operations/handoff-service.js';
+import { ReasoningService } from '../operations/reasoning-service.js';
+import { CodeIndexProvider } from '../providers/code-index-provider.js';
+import { LlmProvider, resolveLlmConfig } from '../providers/llm-provider.js';
+import { GitProvider } from '../providers/git-provider.js';
+
+export function createStudioServer({
+  dbPath,
+  workspacePath = process.cwd(),
+  port = 3210
+} = {}) {
+  const store = new SqliteStore(dbPath);
+  const projectService = new ProjectService(store);
+  const checkpointService = new CheckpointService(store, projectService);
+  const briefingService = new BriefingService(store, projectService);
+  const handoffService = new HandoffService(store, projectService, checkpointService);
+
+  let llmProvider = null;
+  let llmError = null;
+  try {
+    const config = resolveLlmConfig(process.env, {}, workspacePath);
+    llmProvider = new LlmProvider(config);
+  } catch (err) {
+    llmError = err.message;
+  }
+
+  const reasoningService = new ReasoningService(store, projectService, briefingService, {
+    llmProvider,
+    codeIndexProvider: CodeIndexProvider
+  });
+
+  function setCorsHeaders(res) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+
+  const server = createServer(async (req, res) => {
+    setCorsHeaders(res);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const pathname = url.pathname;
+
+    try {
+      if (pathname === '/api/status' && req.method === 'GET') {
+        const project = projectService.initProject(workspacePath);
+        const tasks = store.listTasks(project.project_id, 'all');
+        const activeTasks = tasks.filter(t => t.status === 'active');
+        const checkpoints = store.getCheckpoints(project.project_id, { limit: 100 });
+        const git = GitProvider.collect(workspacePath).git;
+
+        let driftCount = 0;
+        let driftDetails = [];
+        for (const task of activeTasks) {
+          try {
+            const briefing = briefingService.generateBriefing({
+              workspacePath,
+              taskId: task.task_id,
+              destination: 'cli'
+            });
+            if (briefing.driftDetected) {
+              driftCount++;
+              driftDetails.push({ taskId: task.task_id, warnings: briefing.warnings });
+            }
+          } catch {
+            // Task might have 0 checkpoints
+          }
+        }
+
+        let activeLlmConfig = null;
+        let activeLlmError = null;
+        try {
+          activeLlmConfig = resolveLlmConfig(process.env, {}, workspacePath);
+        } catch (err) {
+          activeLlmError = err.message;
+        }
+
+        const healthScore = Math.max(70, 100 - (driftCount * 12) - (activeTasks.length > 5 ? 5 : 0));
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          project: {
+            id: project.project_id,
+            name: project.name,
+            path: project.canonical_path
+          },
+          ai: {
+            connected: !activeLlmError && !!activeLlmConfig,
+            provider: activeLlmConfig ? activeLlmConfig.provider : 'ollama',
+            model: activeLlmConfig ? activeLlmConfig.model : 'llama3.1:8b',
+            baseUrl: activeLlmConfig ? activeLlmConfig.baseUrl : null,
+            error: activeLlmError
+          },
+          tasks: {
+            total: tasks.length,
+            active: activeTasks.length,
+            list: tasks
+          },
+          checkpointsCount: checkpoints.length,
+          lastCheckpoint: checkpoints[checkpoints.length - 1] || null,
+          git: git ? { commit: git.commit_hash, branch: git.branch, isDirty: git.is_dirty } : null,
+          health: {
+            score: healthScore,
+            driftDetected: driftCount > 0,
+            driftCount,
+            driftDetails
+          }
+        }));
+        return;
+      }
+
+      if (pathname === '/api/memory' && req.method === 'GET') {
+        const project = projectService.initProject(workspacePath);
+        const checkpoints = store.getCheckpoints(project.project_id);
+        const allowedDocs = store.getDocumentPolicy(project.project_id);
+        const codeIndex = CodeIndexProvider.build(workspacePath);
+
+        const allDecisions = [];
+        const seenDecisions = new Set();
+        const allConstraints = new Set();
+
+        for (const cp of checkpoints) {
+          if (cp.claims.decisions) {
+            for (const d of cp.claims.decisions) {
+              if (!seenDecisions.has(d.id)) {
+                seenDecisions.add(d.id);
+                allDecisions.push({ ...d, taskId: cp.task_id, timestamp: cp.timestamp });
+              }
+            }
+          }
+          if (cp.claims.constraints) {
+            for (const c of cp.claims.constraints) {
+              allConstraints.add(c);
+            }
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          filesIndexed: codeIndex.files.length,
+          symbolsIndexed: codeIndex.files.reduce((acc, f) => acc + ((f.symbols?.functions?.length || 0) + (f.symbols?.classes?.length || 0) + (f.symbols?.exports?.length || 0)), 0),
+          allowedDocuments: allowedDocs,
+          decisions: allDecisions,
+          constraints: Array.from(allConstraints),
+          totalCheckpoints: checkpoints.length
+        }));
+        return;
+      }
+
+      if (pathname === '/api/timeline' && req.method === 'GET') {
+        const project = projectService.initProject(workspacePath);
+        const days = parseInt(url.searchParams.get('days') || '7', 10);
+        const taskId = url.searchParams.get('taskId') || undefined;
+        const recap = briefingService.generateRecap({
+          workspacePath,
+          days,
+          taskId,
+          destination: 'cli'
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          recapText: recap.recapText,
+          checkpoints: recap.checkpoints,
+          taskCount: recap.taskCount
+        }));
+        return;
+      }
+
+      if (pathname === '/api/graph' && req.method === 'GET') {
+        const project = projectService.initProject(workspacePath);
+        const codeIndex = CodeIndexProvider.build(workspacePath);
+        const checkpoints = store.getCheckpoints(project.project_id);
+        const changedFiles = new Set(GitProvider.collectChangedFiles(workspacePath).files || []);
+
+        // Dynamically cluster code files by architectural module
+        const moduleMap = new Map();
+        for (const file of codeIndex.files) {
+          const parts = file.path.split('/');
+          let modId = parts[0];
+          if (file.path === 'src/index.js') {
+            modId = 'core';
+          } else if (file.path.startsWith('src/')) {
+            modId = parts[1] || 'core';
+          } else if (file.path.startsWith('test/')) {
+            modId = 'tests';
+          } else if (file.path.startsWith('wiki/')) {
+            modId = 'wiki';
+          } else if (file.path.startsWith('studio/')) {
+            modId = 'studio-ui';
+          } else if (file.path.startsWith('bin/')) {
+            modId = 'cli';
+          } else {
+            modId = 'project-root';
+          }
+
+          if (!moduleMap.has(modId)) {
+            const prettyNames = {
+              'policy': 'Security & Boundaries',
+              'storage': 'SQLite Context Store',
+              'operations': 'Continuity & Handoff Services',
+              'providers': 'AI LLM & AST Code Index',
+              'mcp': 'Harness MCP Bridge',
+              'studio': 'Studio API Server',
+              'core': 'Core Hashes & Errors',
+              'cli': 'Unified CLI Interface',
+              'studio-ui': 'React Studio Frontend',
+              'tests': 'Automated Test Suite (62 Tests)',
+              'wiki': 'Architecture Wiki (ADR 001-014)',
+              'project-root': 'Project Root & Config'
+            };
+            moduleMap.set(modId, {
+              id: modId,
+              name: prettyNames[modId] || modId.toUpperCase(),
+              category: (modId === 'policy' || modId === 'storage') ? 'Security & Data' : modId === 'providers' ? 'AI / LLM' : modId === 'mcp' ? 'Integration' : modId === 'wiki' ? 'Governance' : 'Core',
+              owner: 'VectorForce',
+              files: [],
+              drift: false,
+              dependencies: new Set(),
+              symbolsCount: 0
+            });
+          }
+          const m = moduleMap.get(modId);
+          m.files.push(file.path);
+          if (changedFiles.has(file.path)) {
+            m.drift = true;
+          }
+          if (file.symbols) {
+            m.symbolsCount += (file.symbols.functions?.length || 0) + (file.symbols.classes?.length || 0) + (file.symbols.exports?.length || 0);
+          }
+        }
+
+        // Map codeIndex.edges to module dependencies
+        for (const edge of codeIndex.edges) {
+          const fromParts = edge.from.split('/');
+          const toParts = edge.to.split('/');
+          const fromMod = fromParts[0] === 'src' ? (fromParts[1] || 'core') : fromParts[0];
+          const toMod = toParts[0] === 'src' ? (toParts[1] || 'core') : toParts[0];
+          if (fromMod !== toMod && moduleMap.has(fromMod) && moduleMap.has(toMod)) {
+            moduleMap.get(fromMod).dependencies.add(toMod);
+          }
+        }
+
+        // Link real ADR decisions from checkpoints
+        const allDecisions = [];
+        for (const cp of checkpoints) {
+          if (cp.claims?.decisions) {
+            for (const d of cp.claims.decisions) {
+              allDecisions.push(`${d.id}: ${d.title}`);
+            }
+          }
+        }
+
+        const modules = Array.from(moduleMap.values()).map(m => ({
+          ...m,
+          status: m.drift ? 'Drift Detected' : 'Verified',
+          dependencies: Array.from(m.dependencies),
+          decisions: allDecisions.slice(0, 3)
+        }));
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ modules }));
+        return;
+      }
+
+      if (pathname === '/api/team' && req.method === 'GET') {
+        const project = projectService.initProject(workspacePath);
+        const checkpoints = store.getCheckpoints(project.project_id);
+
+        const authorMap = new Map();
+        for (const cp of checkpoints) {
+          const name = cp.author?.name || 'developer';
+          if (!authorMap.has(name)) {
+            authorMap.set(name, {
+              id: name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+              name,
+              role: name === 'omprakashprajapat' ? 'Lead Architect / Owner' : 'Collaborator',
+              harness: cp.author?.harness || 'cli',
+              tasks: new Set(),
+              checkpointsCount: 0,
+              lastActive: cp.timestamp
+            });
+          }
+          const a = authorMap.get(name);
+          a.tasks.add(cp.task_id);
+          a.checkpointsCount++;
+          if (new Date(cp.timestamp) > new Date(a.lastActive)) {
+            a.lastActive = cp.timestamp;
+            a.harness = cp.author?.harness || a.harness;
+          }
+        }
+
+        const team = Array.from(authorMap.values()).map(a => ({
+          ...a,
+          tasks: Array.from(a.tasks)
+        }));
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ team, totalCheckpoints: checkpoints.length }));
+        return;
+      }
+
+      if (pathname === '/api/handoff/export' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const data = JSON.parse(body || '{}');
+            const result = handoffService.exportHandoff({
+              workspacePath,
+              taskId: data.taskId || 'phase-5-pilot',
+              checkpointId: data.checkpointId || undefined,
+              recipient: data.recipient || 'Collaborator',
+              destinationHarness: data.destinationHarness || 'any'
+            });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result));
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
+      if (pathname === '/api/reason' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const data = JSON.parse(body || '{}');
+            const result = await reasoningService.reasonAboutTask({
+              workspacePath,
+              taskId: data.taskId,
+              checkpointId: data.checkpointId,
+              focus: data.focus || undefined,
+              model: data.model || undefined,
+              destination: 'cli',
+              maxTokens: 4000,
+              includeCode: data.includeCode !== false,
+              _viaStudio: true
+            });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result));
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
+      if (pathname === '/api/checkpoint' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const data = JSON.parse(body || '{}');
+            const result = checkpointService.captureCheckpoint({
+              workspacePath,
+              taskId: data.taskId || 'main',
+              summary: data.summary,
+              goals: data.goals || [],
+              constraints: data.constraints || [],
+              decisions: data.decisions || [],
+              nextSteps: data.nextSteps || [],
+              requestedDocuments: data.requestedDocuments || [],
+              includeGit: data.includeGit !== false,
+              authorName: data.authorName || 'developer',
+              authorHarness: 'studio'
+            });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result));
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
+      // Serve static assets from studio/dist for standalone Studio UI
+      const bundledDist = fileURLToPath(new URL('../../studio/dist', import.meta.url));
+      const workspaceDist = join(workspacePath, 'studio', 'dist');
+      const distDir = existsSync(workspaceDist) ? workspaceDist : bundledDist;
+      if (existsSync(distDir)) {
+        let filePath = join(distDir, pathname === '/' ? 'index.html' : pathname.slice(1));
+        if (!existsSync(filePath)) {
+          filePath = join(distDir, 'index.html');
+        }
+        if (existsSync(filePath)) {
+          const ext = extname(filePath).toLowerCase();
+          const mimeTypes = {
+            '.html': 'text/html; charset=utf-8',
+            '.js': 'text/javascript; charset=utf-8',
+            '.css': 'text/css; charset=utf-8',
+            '.json': 'application/json',
+            '.png': 'image/png',
+            '.svg': 'image/svg+xml'
+          };
+          const contentType = mimeTypes[ext] || 'application/octet-stream';
+          const content = readFileSync(filePath);
+          res.writeHead(200, { 'Content-Type': contentType });
+          res.end(content);
+          return;
+        }
+      } else {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(`<!DOCTYPE html><html><body style="font-family:system-ui,-apple-system,sans-serif;background:#090d16;color:#e2e8f0;display:flex;flex-direction:column;align-items:center;justify-content:center;height:90vh;text-align:center;">
+          <h1 style="color:#60a5fa;margin-bottom:8px;">VectorForce Studio API is Active</h1>
+          <p style="color:#94a3b8;max-width:500px;line-height:1.6;">The backend is connected to SQLite and serving APIs at <a href="/api/status" style="color:#38bdf8;">/api/status</a>. To build the UI bundle, run:<br/><code style="background:#1e293b;padding:4px 8px;border-radius:4px;color:#a5b4fc;display:inline-block;margin-top:12px;">cd studio &amp;&amp; npm install &amp;&amp; npm run build</code></p>
+        </body></html>`);
+        return;
+      }
+
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Endpoint not found' }));
+    } catch (err) {
+      console.error('SERVER CATCH ERROR:', err);
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    }
+  });
+
+  return {
+    server,
+    start() {
+      return new Promise((resolve) => {
+        server.listen(port, () => {
+          resolve(`http://localhost:${port}`);
+        });
+      });
+    },
+    stop() {
+      return new Promise((resolve) => {
+        store.close();
+        server.close(resolve);
+      });
+    }
+  };
+}

@@ -635,6 +635,108 @@ async function main() {
           break;
         }
 
+        if (sub === 'ollama') {
+          const model = args[2] || 'llama3.1:8b';
+          const baseUrl = args[3] || 'http://127.0.0.1:11434';
+          const vfDir = join(cwd, '.vectorforce');
+          mkdirSync(vfDir, { recursive: true, mode: 0o700 });
+          const cfgPath = join(vfDir, 'config.json');
+          let existing = {};
+          if (existsSync(cfgPath)) {
+            try { existing = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch {}
+          }
+          existing.VF_LLM_PROVIDER = 'ollama';
+          existing.VF_OLLAMA_MODEL = model;
+          existing.VF_OLLAMA_BASE_URL = baseUrl;
+          writeFileSync(cfgPath, JSON.stringify(existing, null, 2) + '\n', 'utf8');
+          console.log(`\n✔ Configured Local Ollama in ${cfgPath}`);
+          console.log(`  Provider: ollama (100% Local & Private)`);
+          console.log(`  Model:    ${model}`);
+          console.log(`  Base URL: ${baseUrl}`);
+          break;
+        }
+
+        if (sub === 'openai' || sub === 'codex') {
+          const key = args[2];
+          const model = args[3] || 'o3-mini';
+          const baseUrl = args[4] || 'https://api.openai.com/v1';
+          if (!key) {
+            console.error('Usage: node bin/vf.js config openai <API_KEY> [MODEL] [BASE_URL]');
+            process.exit(1);
+          }
+          const vfDir = join(cwd, '.vectorforce');
+          mkdirSync(vfDir, { recursive: true, mode: 0o700 });
+          const cfgPath = join(vfDir, 'config.json');
+          let existing = {};
+          if (existsSync(cfgPath)) {
+            try { existing = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch {}
+          }
+          existing.VF_LLM_PROVIDER = 'openai';
+          existing.VF_LLM_API_KEY = key;
+          existing.VF_LLM_MODEL = model;
+          existing.VF_LLM_BASE_URL = baseUrl;
+          writeFileSync(cfgPath, JSON.stringify(existing, null, 2) + '\n', 'utf8');
+          console.log(`\n✔ Configured OpenAI in ${cfgPath}`);
+          console.log(`  Provider: openai`);
+          console.log(`  Model:    ${model}`);
+          console.log(`  Base URL: ${baseUrl}`);
+          break;
+        }
+
+        if (sub === 'anthropic') {
+          const key = args[2];
+          const model = args[3] || 'claude-sonnet-4-20250514';
+          const baseUrl = args[4] || 'https://api.anthropic.com/v1';
+          if (!key) {
+            console.error('Usage: node bin/vf.js config anthropic <API_KEY> [MODEL] [BASE_URL]');
+            process.exit(1);
+          }
+          const vfDir = join(cwd, '.vectorforce');
+          mkdirSync(vfDir, { recursive: true, mode: 0o700 });
+          const cfgPath = join(vfDir, 'config.json');
+          let existing = {};
+          if (existsSync(cfgPath)) {
+            try { existing = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch {}
+          }
+          existing.VF_LLM_PROVIDER = 'anthropic';
+          existing.VF_LLM_API_KEY = key;
+          existing.VF_LLM_MODEL = model;
+          existing.VF_LLM_BASE_URL = baseUrl;
+          writeFileSync(cfgPath, JSON.stringify(existing, null, 2) + '\n', 'utf8');
+          console.log(`\n✔ Configured Anthropic in ${cfgPath}`);
+          console.log(`  Provider: anthropic`);
+          console.log(`  Model:    ${model}`);
+          console.log(`  Base URL: ${baseUrl}`);
+          break;
+        }
+
+        if (sub === 'byok') {
+          const baseUrl = args[2];
+          const key = args[3];
+          const model = args[4] || 'llama-3.3-70b-versatile';
+          if (!baseUrl || !key) {
+            console.error('Usage: node bin/vf.js config byok <BASE_URL> <API_KEY> [MODEL]');
+            process.exit(1);
+          }
+          const vfDir = join(cwd, '.vectorforce');
+          mkdirSync(vfDir, { recursive: true, mode: 0o700 });
+          const cfgPath = join(vfDir, 'config.json');
+          let existing = {};
+          if (existsSync(cfgPath)) {
+            try { existing = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch {}
+          }
+          existing.VF_LLM_PROVIDER = 'byok';
+          existing.VF_LLM_BASE_URL = baseUrl;
+          existing.VF_LLM_API_KEY = key;
+          existing.VF_LLM_MODEL = model;
+          writeFileSync(cfgPath, JSON.stringify(existing, null, 2) + '\n', 'utf8');
+          console.log(`\n✔ Configured Custom BYOK Endpoint in ${cfgPath}`);
+          console.log(`  Provider: byok`);
+          console.log(`  Model:    ${model}`);
+          console.log(`  Base URL: ${baseUrl}`);
+          break;
+        }
+
         if (sub === 'show' || sub === 'status') {
           const cfg = resolveLlmConfig(process.env, {}, cwd);
           console.log('\nVectorForce AI Reasoning Configuration:');

@@ -140,10 +140,12 @@ export function resolveLlmConfig(env = process.env, overrides = {}, workspacePat
     return { provider: 'muse', baseUrl, apiKey, model, timeoutMs };
   }
 
-  if (provider === 'openai' || provider === 'codex') {
-    const baseUrl = trimTrailingSlash(overrides.baseUrl || mergedEnv.VF_CODEX_BASE_URL || mergedEnv.OPENAI_BASE_URL || mergedEnv.VF_LLM_BASE_URL || '');
-    const apiKey = overrides.apiKey ?? mergedEnv.VF_CODEX_API_KEY ?? mergedEnv.OPENAI_API_KEY ?? mergedEnv.VF_LLM_API_KEY ?? null;
-    const model = overrides.model || mergedEnv.VF_CODEX_MODEL || mergedEnv.VF_LLM_MODEL || DEFAULT_CLOUD_MODEL;
+  if (provider === 'openai' || provider === 'codex' || provider === 'anthropic' || provider === 'byok') {
+    const defaultBase = provider === 'anthropic' ? 'https://api.anthropic.com/v1' : '';
+    const baseUrl = trimTrailingSlash(overrides.baseUrl || mergedEnv.VF_CODEX_BASE_URL || mergedEnv.OPENAI_BASE_URL || mergedEnv.ANTHROPIC_BASE_URL || mergedEnv.VF_LLM_BASE_URL || defaultBase);
+    const apiKey = overrides.apiKey ?? mergedEnv.VF_CODEX_API_KEY ?? mergedEnv.OPENAI_API_KEY ?? mergedEnv.ANTHROPIC_API_KEY ?? mergedEnv.VF_LLM_API_KEY ?? null;
+    const defaultModel = provider === 'anthropic' ? 'claude-sonnet-4-20250514' : DEFAULT_CLOUD_MODEL;
+    const model = overrides.model || mergedEnv.VF_CODEX_MODEL || mergedEnv.VF_LLM_MODEL || defaultModel;
     if (!baseUrl) {
       throw new VectorForceError(
         ErrorCode.LLM_CONFIG_INVALID,
@@ -158,7 +160,7 @@ export function resolveLlmConfig(env = process.env, overrides = {}, workspacePat
 
   throw new VectorForceError(
     ErrorCode.LLM_CONFIG_INVALID,
-    `Unknown LLM provider '${provider}'. Use 'openrouter', 'muse', 'codex', 'openai' (cloud) or 'ollama' (local).`
+    `Unknown LLM provider '${provider}'. Use 'openrouter', 'muse', 'codex', 'openai', 'anthropic', 'byok' (cloud) or 'ollama' (local).`
   );
 }
 

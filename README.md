@@ -2,11 +2,12 @@
 
 > **Git for AI Context** — A local-first, privacy-preserving engineering memory platform and architecture control center for AI coding agents.
 
-[![Tests](https://img.shields.io/badge/tests-65%20passing-brightgreen.svg)](#test-suite)
+[![Website](https://img.shields.io/badge/website-getvectorforce.github.io-6366f1.svg)](https://getvectorforce.github.io/)
+[![Tests](https://img.shields.io/badge/tests-75%20passing%20(Linux%20%7C%20macOS%20%7C%20Windows)-brightgreen.svg)](https://github.com/getvectorforce/VectorForce/actions)
 [![Dependencies](https://img.shields.io/badge/backend%20runtime%20deps-zero-blue.svg)](#architecture-invariants)
 [![Storage](https://img.shields.io/badge/storage-local%20SQLite%20WAL-orange.svg)](#local-first-architecture)
-[![Harnesses](https://img.shields.io/badge/harnesses-Antigravity%20%7C%20Command%20Code%20%7C%20Codex%20%7C%20Muse-purple.svg)](#harness-integrations)
-[![Hackathon](https://img.shields.io/badge/Meta%20Muse%20Hackathon-2026-blueviolet.svg)](#meta-muse-hackathon)
+[![Harnesses](https://img.shields.io/badge/harnesses-Antigravity%20%7C%20Claude%20Code%20%7C%20Command%20Code%20%7C%20Codex%20%7C%20Muse-purple.svg)](#model-context-protocol-mcp)
+[![Hackathon](https://img.shields.io/badge/Meta%20Muse%20Hackathon-2026-blueviolet.svg)](#5-reason-over-context-ai-engineering-memory)
 
 ---
 
@@ -73,30 +74,74 @@ node bin/vf.js checkpoint --task auth-module \
 ```
 
 ### 5. Reason Over Context (AI Engineering Memory)
+
+VectorForce prioritizes **Meta Muse (`muse-spark-1.3`)** and the open-weights **Meta Muse Spark Open (`muse-spark-open` • 1M token context window)** as its **#1 reasoning models**, while also supporting **Fireworks AI**, **OpenRouter**, **Local Ollama**, **OpenAI / Codex**, **Anthropic Claude**, and any **Custom BYOK** OpenAI-compatible endpoint:
+
 ```bash
-# Uses local Ollama by default, or cloud providers (Meta Muse, OpenRouter, OpenAI Codex)
-# With Meta Muse (Responses API at api.meta.ai):
-node bin/vf.js config muse <API_KEY>
+# 1. [1st Priority] Meta Muse Direct API (Responses API at api.meta.ai/v1 • muse-spark-1.3):
+node bin/vf.js config muse <YOUR_META_API_KEY>
 node bin/vf.js reason --task auth-module
 
-# With OpenRouter + DeepSeek v4.1 Flash:
-export OPENROUTER_API_KEY="sk-or-v1-..."
+# 2. [1st Priority Open-Weights] Meta "Muse Spark Open" (1M Context) via Fireworks AI:
+node bin/vf.js config fireworks <YOUR_FIREWORKS_API_KEY> accounts/fireworks/models/muse-spark-open
 node bin/vf.js reason --task auth-module
 
-# Or specify model explicitly:
-node bin/vf.js reason --task auth-module --model deepseek/deepseek-v4.1-flash-1017
+# 3. OpenRouter — Meta Muse Spark Open (meta/muse-spark-open), DeepSeek, Claude, Llama 3.3:
+node bin/vf.js config openrouter <YOUR_OPENROUTER_API_KEY> meta/muse-spark-open
+node bin/vf.js config openrouter <YOUR_OPENROUTER_API_KEY> deepseek/deepseek-v4.1-flash-1017
+node bin/vf.js reason --task auth-module
 
-# Degrades deterministically if no LLM provider is configured
-node bin/vf.js reason --task auth-module --no-llm
+# 4. Local Ollama (100% Offline & Private — Default when no cloud API key is set):
+ollama pull llama3.1:8b
+node bin/vf.js config ollama llama3.1:8b
+node bin/vf.js reason --task auth-module
+
+# 5. OpenAI / Codex (o3-mini, gpt-4.1, gpt-4o):
+node bin/vf.js config openai <YOUR_OPENAI_API_KEY> o3-mini
+node bin/vf.js reason --task auth-module
+
+# 6. Anthropic Claude (claude-sonnet-4-20250514, claude-3-7-sonnet-latest):
+node bin/vf.js config anthropic <YOUR_ANTHROPIC_API_KEY> claude-sonnet-4-20250514
+node bin/vf.js reason --task auth-module
+
+# 7. Custom BYOK (Groq, Together AI, LM Studio, vLLM, Azure):
+node bin/vf.js config byok https://api.groq.com/openai/v1 <GROQ_API_KEY> llama-3.3-70b-versatile
+node bin/vf.js config byok http://127.0.0.1:1234/v1 lm-studio qwen2.5-coder-14b
+
+# Check active model configuration or run deterministic briefing (--raw):
+node bin/vf.js config status
+node bin/vf.js reason --task auth-module --raw
+
+# Launch VectorForce Studio Web Control Center on http://127.0.0.1:3210
+node bin/vf.js studio
 ```
 
 ---
 
 ## Model Context Protocol (MCP)
 
-VectorForce exposes a standard stdio JSON-RPC MCP server for direct integration into **Google Antigravity**, **Command Code**, **Meta Muse**, and **OpenAI Codex**:
+VectorForce exposes a standard stdio JSON-RPC MCP server for direct integration into **Google Antigravity**, **Claude Code**, **Command Code**, **Meta Muse**, and **OpenAI Codex**.
 
-### JSON Configuration (Antigravity, Command Code, Muse)
+> **How MCP Starts:** You **never** need to run `vf mcp` manually in a terminal. Each AI coding agent reads its configuration file below and automatically spawns VectorForce in the background over `stdio`.
+
+| AI Coding Client | Config File Read by Client | 1-Command Auto-Setup |
+|---|---|---|
+| **Google Antigravity** | `.agents/mcp_config.json` & `~/.gemini/antigravity/mcp_config.json` | `node bin/vf.js config install antigravity` |
+| **Claude Code (`claude`)** | `.mcp.json` (project root) | `node bin/vf.js config install claude-code` |
+| **Command Code (`cmd`)** | `.mcp.json` & `commandcode.json` | `node bin/vf.js config install command-code` |
+| **Meta Muse (`muse`)** | `.muse/mcp_config.json` & `~/.config/muse/settings.json` | `node bin/vf.js config install muse` |
+| **OpenAI Codex (`codex`)** | `.codex/config.toml` & `~/.codex/config.toml` | `node bin/vf.js config install codex` |
+
+### Automated Configuration & Health Check
+```bash
+# Auto-configure all supported AI harnesses at once:
+node bin/vf.js config install all
+
+# Verify SQLite DB, AGENTS.md, and all MCP client configs:
+node bin/vf.js status
+```
+
+### JSON Configuration (Antigravity, Claude Code, Command Code, Muse)
 ```json
 {
   "mcpServers": {
@@ -115,17 +160,6 @@ command = "node"
 args = ["/absolute/path/to/VectorForce/bin/vf.js", "mcp"]
 [mcp_servers.vectorforce.env]
 VF_HARNESS = "codex"
-```
-
-### Automated Configuration
-```bash
-# Auto-configure for a specific harness:
-node bin/vf.js config install codex
-node bin/vf.js config install antigravity
-node bin/vf.js config install command-code
-
-# Or install for all supported harnesses at once:
-node bin/vf.js config install all
 ```
 
 ### Available MCP Tools
@@ -165,10 +199,14 @@ All design decisions are formalized in the [`wiki/`](wiki/README.md):
 
 ---
 
-## Verification & Test Suite
+## Verification & Cross-OS Test Suite (Linux, macOS, Windows)
 
-Run the full automated test suite (62 tests across 15 suites):
+Run the full automated test suite (75 unit & security tests) and the 7-stage practical multi-developer environment simulation:
 
 ```bash
+# Run all 75 unit, policy, MCP, and security tests:
 npm test
+
+# Run the 7-stage practical real-world environment simulation (Git + CLI + live MCP stdio + Handoff + Drift):
+npm run test:practical
 ```

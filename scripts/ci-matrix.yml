@@ -1,0 +1,42 @@
+name: Cross-OS Matrix CI (Linux, macOS, Windows)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  cross-os-test-matrix:
+    name: "Test Suite & Practical Simulation (${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: ['22.x']
+
+    steps:
+      - name: Checkout VectorForce Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Verify OS & Node.js Built-in SQLite Availability
+        shell: bash
+        run: |
+          echo "Operating System: ${{ runner.os }} (${{ matrix.os }})"
+          node -v
+          node -e "import('node:sqlite').then(() => console.log('✔ node:sqlite built-in verified'))"
+
+      - name: Run Full 75-Test Suite
+        shell: bash
+        run: npm test
+
+      - name: Practical Real-World Developer Environment Simulation
+        shell: bash
+        run: npm run test:practical

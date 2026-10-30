@@ -5,10 +5,12 @@
   "type": "module",
   "main": "src/index.js",
   "bin": {
-    "vf": "./bin/vf.js"
+    "vf": "bin/vf.js",
+    "vectorforce": "bin/vf.js"
   },
   "scripts": {
-    "test": "node --test test/**/*.test.js"
+    "test": "node --test \"test/**/*.test.js\"",
+    "test:practical": "node scripts/practical-test-env.js"
   },
   "engines": {
     "node": ">=22.5.0"

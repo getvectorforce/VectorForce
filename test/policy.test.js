@@ -41,7 +41,12 @@ test('T13 Policy: Rejects symbolic links', () => {
   try {
     const targetFile = fixture.createFile('real.md', '# Real File');
     const linkPath = join(fixture.workspacePath, 'link.md');
-    symlinkSync(targetFile, linkPath);
+    try {
+      symlinkSync(targetFile, linkPath);
+    } catch (err) {
+      if (err && (err.code === 'EPERM' || err.code === 'ENOSYS')) return;
+      throw err;
+    }
 
     assert.throws(() => {
       Authorizer.validateDocumentPath(fixture.workspacePath, 'link.md');

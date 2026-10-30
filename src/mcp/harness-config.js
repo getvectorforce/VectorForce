@@ -1,13 +1,25 @@
 import { join, resolve } from 'node:path';
-import { homedir } from 'node:os';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, realpathSync } from 'node:fs';
+
+function isTempWorkspace(workspacePath) {
+  if (process.env.VF_NO_GLOBAL_CONFIG === '1' || process.env.NODE_TEST_CONTEXT) return true;
+  try {
+    const realWs = realpathSync(workspacePath);
+    const realTmp = realpathSync(tmpdir());
+    return realWs.startsWith(realTmp);
+  } catch {
+    return workspacePath.startsWith(tmpdir()) || workspacePath.includes('vf-test-') || workspacePath.includes('vf-practical-');
+  }
+}
 
 export class HarnessConfig {
   /**
-   * Get the absolute path to bin/vf.js
+   * Get the absolute path to bin/vf.js (cross-platform: macOS, Linux, Windows)
    */
   static getBinPath() {
-    return resolve(new URL('../../bin/vf.js', import.meta.url).pathname);
+    return fileURLToPath(new URL('../../bin/vf.js', import.meta.url));
   }
 
   /**
@@ -66,6 +78,36 @@ export class HarnessConfig {
       mkdirSync(dir, { recursive: true, mode: 0o755 });
     }
     writeFileSync(filePath, JSON.stringify(mergedContent, null, 2) + '\n', 'utf8');
+
+    if (!isTempWorkspace(workspacePath)) {
+      try {
+        const globalAgyDir = join(homedir(), '.gemini', 'antigravity');
+        if (existsSync(globalAgyDir)) {
+          const globalMcpPath = join(globalAgyDir, 'mcp_config.json');
+          let globalConfig = {};
+          if (existsSync(globalMcpPath)) {
+            try {
+              globalConfig = JSON.parse(readFileSync(globalMcpPath, 'utf8'));
+            } catch {
+              globalConfig = {};
+            }
+          }
+          globalConfig.mcpServers = {
+            ...(globalConfig.mcpServers || {}),
+            vectorforce: {
+              command: 'node',
+              args: [HarnessConfig.getBinPath(), 'mcp', '--workspace', workspacePath],
+              env: {
+                VF_WORKSPACE: workspacePath,
+                VF_DB_PATH: join(workspacePath, '.vectorforce', 'vectorforce.db')
+              }
+            }
+          };
+          writeFileSync(globalMcpPath, JSON.stringify(globalConfig, null, 2) + '\n', 'utf8');
+        }
+      } catch {}
+    }
+
     return filePath;
   }
 
@@ -265,28 +307,30 @@ export class HarnessConfig {
     writeFileSync(filePath, JSON.stringify(mergedContent, null, 2) + '\n', 'utf8');
     writeFileSync(museJsonPath, JSON.stringify(mergedContent, null, 2) + '\n', 'utf8');
 
-    try {
-      const globalMuseDir = join(homedir(), '.config', 'muse');
-      const globalSettingsPath = join(globalMuseDir, 'settings.json');
-      if (existsSync(globalSettingsPath)) {
-        const settings = JSON.parse(readFileSync(globalSettingsPath, 'utf8'));
-        settings.mcp_servers = {
-          ...(settings.mcp_servers || {}),
-          vectorforce: {
-            transport: 'stdio',
-            command: 'node',
-            args: [HarnessConfig.getBinPath(), 'mcp'],
-            env: {
-              VF_HARNESS: 'muse-code',
-              VF_WORKSPACE: workspacePath
-            },
-            mode: 'optional'
-          }
-        };
-        delete settings.mcpServers;
-        writeFileSync(globalSettingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
-      }
-    } catch {}
+    if (!isTempWorkspace(workspacePath)) {
+      try {
+        const globalMuseDir = join(homedir(), '.config', 'muse');
+        const globalSettingsPath = join(globalMuseDir, 'settings.json');
+        if (existsSync(globalSettingsPath)) {
+          const settings = JSON.parse(readFileSync(globalSettingsPath, 'utf8'));
+          settings.mcp_servers = {
+            ...(settings.mcp_servers || {}),
+            vectorforce: {
+              transport: 'stdio',
+              command: 'node',
+              args: [HarnessConfig.getBinPath(), 'mcp'],
+              env: {
+                VF_HARNESS: 'muse-code',
+                VF_WORKSPACE: workspacePath
+              },
+              mode: 'optional'
+            }
+          };
+          delete settings.mcpServers;
+          writeFileSync(globalSettingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+        }
+      } catch {}
+    }
 
     return filePath;
   }
@@ -322,16 +366,18 @@ export class HarnessConfig {
       } catch {}
     }
 
-    try {
-      const globalSettingsPath = join(homedir(), '.config', 'muse', 'settings.json');
-      if (existsSync(globalSettingsPath)) {
-        const settings = JSON.parse(readFileSync(globalSettingsPath, 'utf8'));
-        if (settings?.mcp_servers?.vectorforce) {
-          delete settings.mcp_servers.vectorforce;
-          writeFileSync(globalSettingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+    if (!isTempWorkspace(workspacePath)) {
+      try {
+        const globalSettingsPath = join(homedir(), '.config', 'muse', 'settings.json');
+        if (existsSync(globalSettingsPath)) {
+          const settings = JSON.parse(readFileSync(globalSettingsPath, 'utf8'));
+          if (settings?.mcp_servers?.vectorforce) {
+            delete settings.mcp_servers.vectorforce;
+            writeFileSync(globalSettingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     return removed;
   }
@@ -355,7 +401,7 @@ export class HarnessConfig {
    * @returns {string} merged TOML
    */
   static _mergeCodexToml(existingToml) {
-    const binPath = HarnessConfig.getBinPath();
+    const binPath = HarnessConfig.getBinPath().replace(/\\/g, '\\\\');
     const serverBlock = `[mcp_servers.vectorforce]\ncommand = "node"\nargs = ["${binPath}", "mcp"]\n[mcp_servers.vectorforce.env]\nVF_HARNESS = "codex"\n`;
 
     if (!existingToml || !existingToml.trim()) {
@@ -434,15 +480,17 @@ export class HarnessConfig {
     writeFileSync(filePath, mergedContent, 'utf8');
     writeFileSync(codexJsonPath, JSON.stringify(mergedJson, null, 2) + '\n', 'utf8');
 
-    try {
-      const globalCodex = join(homedir(), '.codex');
-      if (existsSync(globalCodex)) {
-        const globalTomlPath = join(globalCodex, 'config.toml');
-        const existingGlobal = existsSync(globalTomlPath) ? readFileSync(globalTomlPath, 'utf8') : '';
-        const updatedGlobal = HarnessConfig._mergeCodexToml(existingGlobal);
-        writeFileSync(globalTomlPath, updatedGlobal, 'utf8');
-      }
-    } catch {}
+    if (!isTempWorkspace(workspacePath)) {
+      try {
+        const globalCodex = join(homedir(), '.codex');
+        if (existsSync(globalCodex)) {
+          const globalTomlPath = join(globalCodex, 'config.toml');
+          const existingGlobal = existsSync(globalTomlPath) ? readFileSync(globalTomlPath, 'utf8') : '';
+          const updatedGlobal = HarnessConfig._mergeCodexToml(existingGlobal);
+          writeFileSync(globalTomlPath, updatedGlobal, 'utf8');
+        }
+      } catch {}
+    }
 
     return filePath;
   }

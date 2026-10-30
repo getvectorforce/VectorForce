@@ -508,21 +508,41 @@ async function main() {
           const installed = [];
           if (target === 'antigravity' || target === 'all') {
             const p = HarnessConfig.installAntigravity(cwd);
-            installed.push(`Antigravity -> ${p}`);
+            installed.push(`Google Antigravity -> ${p} (+ ~/.gemini/antigravity/mcp_config.json)`);
           }
-          if (target === 'command-code' || target === 'cmd' || target === 'all') {
+          if (target === 'command-code' || target === 'cmd' || target === 'claude' || target === 'claude-code' || target === 'all') {
             const p = HarnessConfig.installCommandCode(cwd);
-            installed.push(`Command Code -> ${p}`);
+            installed.push(`Command Code / Claude Code -> .mcp.json & ${p}`);
           }
           if (target === 'muse' || target === 'muse-code' || target === 'all') {
             const p = HarnessConfig.installMuseCode(cwd);
-            installed.push(`Muse Code -> ${p}`);
+            installed.push(`Meta Muse -> ${p} (+ ~/.config/muse/settings.json)`);
           }
           if (target === 'codex' || target === 'all') {
             const p = HarnessConfig.installCodex(cwd);
-            installed.push(`Codex -> ${p}`);
+            installed.push(`Codex -> ${p} (+ ~/.codex/config.toml)`);
           }
           console.log(`\n✔ Configured harness integration(s):\n  - ${installed.join('\n  - ')}`);
+          console.log(`\n💡 Next step: Restart or reload your AI agent, then ask in chat:\n   "List active VectorForce tasks and check workspace drift"`);
+          break;
+        }
+
+        if (sub === 'doctor' || sub === 'check') {
+          const checks = [
+            { name: 'SQLite Database (.vectorforce/vectorforce.db)', ok: existsSync(getDbPath(cwd)), path: getDbPath(cwd) },
+            { name: 'Agent Protocol Rules (AGENTS.md)', ok: existsSync(join(cwd, 'AGENTS.md')), path: join(cwd, 'AGENTS.md') },
+            { name: 'Google Antigravity (.agents/mcp_config.json)', ok: existsSync(join(cwd, '.agents', 'mcp_config.json')), path: join(cwd, '.agents', 'mcp_config.json') },
+            { name: 'Claude Code & Command Code (.mcp.json)', ok: existsSync(join(cwd, '.mcp.json')), path: join(cwd, '.mcp.json') },
+            { name: 'Meta Muse (.muse/mcp_config.json)', ok: existsSync(join(cwd, '.muse', 'mcp_config.json')), path: join(cwd, '.muse', 'mcp_config.json') },
+            { name: 'OpenAI Codex (.codex/config.toml)', ok: existsSync(join(cwd, '.codex', 'config.toml')), path: join(cwd, '.codex', 'config.toml') }
+          ];
+          console.log(`\nVectorForce Workspace & MCP Health Check (${cwd}):\n`);
+          for (const c of checks) {
+            console.log(`  ${c.ok ? '✔ [READY]  ' : '○ [MISSING]'} ${c.name}`);
+          }
+          console.log(`\nHow to verify inside your AI agent chat:`);
+          console.log(`  Ask: "Check active VectorForce tasks and workspace drift"`);
+          console.log(`  Your agent will automatically call MCP tools: list_tasks & check_workspace_drift\n`);
           break;
         }
 
@@ -700,6 +720,27 @@ VectorForce Harness Configuration:
 
    Privacy: set VF_LLM_ALLOW_CODE=false (or run with --no-code) to keep source out of the prompt.
 `);
+        break;
+      }
+
+      case 'doctor':
+      case 'status': {
+        const checks = [
+          { name: 'SQLite Database (.vectorforce/vectorforce.db)', ok: existsSync(getDbPath(cwd)) },
+          { name: 'Agent Protocol Rules (AGENTS.md)', ok: existsSync(join(cwd, 'AGENTS.md')) },
+          { name: 'Google Antigravity (.agents/mcp_config.json)', ok: existsSync(join(cwd, '.agents', 'mcp_config.json')) },
+          { name: 'Claude Code & Command Code (.mcp.json)', ok: existsSync(join(cwd, '.mcp.json')) },
+          { name: 'Meta Muse (.muse/mcp_config.json or musecode.json)', ok: existsSync(join(cwd, '.muse', 'mcp_config.json')) || existsSync(join(cwd, 'musecode.json')) },
+          { name: 'OpenAI Codex (.codex/config.toml)', ok: existsSync(join(cwd, '.codex', 'config.toml')) }
+        ];
+        console.log(`\nVectorForce Workspace & MCP Status (${cwd}):\n`);
+        for (const c of checks) {
+          console.log(`  ${c.ok ? '✔ [READY]  ' : '○ [MISSING]'} ${c.name}`);
+        }
+        console.log(`\n💡 How it works:`);
+        console.log(`  1. You do NOT need to run "vf mcp" manually.`);
+        console.log(`  2. Your AI agent (Antigravity, Claude Code, Command Code, Muse, Codex) reads its config file above and automatically spawns "vf mcp" over stdio.`);
+        console.log(`  3. To verify in your AI chat, ask: "List active VectorForce tasks and check workspace drift"\n`);
         break;
       }
 

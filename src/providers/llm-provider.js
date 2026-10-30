@@ -9,6 +9,8 @@ export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-v4.1-flash-1017';
 export const DEFAULT_MUSE_BASE_URL = 'https://api.meta.ai/v1';
 export const DEFAULT_MUSE_MODEL = 'muse-spark-1.3';
+export const DEFAULT_FIREWORKS_BASE_URL = 'https://api.fireworks.ai/inference/v1';
+export const DEFAULT_FIREWORKS_MODEL = 'accounts/fireworks/models/muse-spark-open';
 export const DEFAULT_TIMEOUT_MS = 60000;
 
 function trimTrailingSlash(url) {
@@ -102,10 +104,11 @@ export function resolveLlmConfig(env = process.env, overrides = {}, workspacePat
   const provider = (
     overrides.provider ||
     mergedEnv.VF_LLM_PROVIDER ||
+    (mergedEnv.FIREWORKS_API_KEY || mergedEnv.VF_FIREWORKS_API_KEY ? 'fireworks' :
     (mergedEnv.OPENROUTER_API_KEY || mergedEnv.VF_OPENROUTER_API_KEY ? 'openrouter' :
     (mergedEnv.VF_CODEX_API_KEY ? 'codex' :
     (mergedEnv.MODEL_API_KEY || mergedEnv.MUSE_API_KEY || mergedEnv.VF_MUSE_API_KEY ? 'muse' :
-    (mergedEnv.VF_LLM_API_KEY ? 'openai' : 'ollama'))))
+    (mergedEnv.VF_LLM_API_KEY ? 'openai' : 'ollama')))))
   ).toLowerCase();
   const timeoutMs = overrides.timeoutMs ?? (mergedEnv.VF_LLM_TIMEOUT_MS ? Number(mergedEnv.VF_LLM_TIMEOUT_MS) : DEFAULT_TIMEOUT_MS);
 
@@ -118,6 +121,16 @@ export function resolveLlmConfig(env = process.env, overrides = {}, workspacePat
       model: overrides.model || mergedEnv.VF_OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL,
       timeoutMs
     };
+  }
+
+  if (provider === 'fireworks') {
+    const baseUrl = trimTrailingSlash(overrides.baseUrl || mergedEnv.VF_FIREWORKS_BASE_URL || mergedEnv.FIREWORKS_BASE_URL || mergedEnv.VF_LLM_BASE_URL || DEFAULT_FIREWORKS_BASE_URL);
+    const apiKey = overrides.apiKey ?? mergedEnv.FIREWORKS_API_KEY ?? mergedEnv.VF_FIREWORKS_API_KEY ?? mergedEnv.VF_LLM_API_KEY ?? null;
+    const model = overrides.model || mergedEnv.VF_FIREWORKS_MODEL || mergedEnv.FIREWORKS_MODEL || mergedEnv.VF_LLM_MODEL || DEFAULT_FIREWORKS_MODEL;
+    if (!apiKey) {
+      throw new VectorForceError(ErrorCode.LLM_CONFIG_INVALID, 'Fireworks provider requires FIREWORKS_API_KEY or VF_FIREWORKS_API_KEY');
+    }
+    return { provider: 'fireworks', baseUrl, apiKey, model, timeoutMs };
   }
 
   if (provider === 'openrouter') {

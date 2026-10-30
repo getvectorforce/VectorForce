@@ -610,6 +610,32 @@ async function main() {
           break;
         }
 
+        if (sub === 'fireworks') {
+          const key = args[2];
+          const model = args[3] || 'accounts/fireworks/models/muse-spark-open';
+          if (!key) {
+            console.error('Usage: node bin/vf.js config fireworks <API_KEY> [MODEL]');
+            process.exit(1);
+          }
+          const vfDir = join(cwd, '.vectorforce');
+          mkdirSync(vfDir, { recursive: true, mode: 0o700 });
+          const cfgPath = join(vfDir, 'config.json');
+          let existing = {};
+          if (existsSync(cfgPath)) {
+            try { existing = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch {}
+          }
+          existing.VF_LLM_PROVIDER = 'fireworks';
+          existing.FIREWORKS_API_KEY = key;
+          existing.VF_FIREWORKS_MODEL = model;
+          existing.VF_FIREWORKS_BASE_URL = 'https://api.fireworks.ai/inference/v1';
+          writeFileSync(cfgPath, JSON.stringify(existing, null, 2) + '\n', 'utf8');
+          console.log(`\n✔ Configured Fireworks AI (Meta Muse Spark Open) in ${cfgPath}`);
+          console.log(`  Provider: fireworks`);
+          console.log(`  Model:    ${model}`);
+          console.log(`  Base URL: https://api.fireworks.ai/inference/v1`);
+          break;
+        }
+
         if (sub === 'muse') {
           const key = args[2];
           const model = args[3] || 'muse-spark-1.3';

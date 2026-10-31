@@ -276,8 +276,8 @@ function parseFlags(args) {
 }
 
 function getRemoteConfig(cwd) {
-  const defaultUrl = process.env.VF_CLOUD_URL || 'https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run';
-  const defaultKey = process.env.VF_SUBSCRIPTION_KEY || 'vf_live_sub_98a7bc65f012e4d9';
+  const defaultUrl = process.env.VF_CLOUD_URL || '';
+  const defaultKey = process.env.VF_SUBSCRIPTION_KEY || '';
   const cfgPath = join(cwd, '.vectorforce', 'config.json');
   try {
     if (existsSync(cfgPath)) {
@@ -285,14 +285,14 @@ function getRemoteConfig(cwd) {
       return {
         remoteUrl: (parsed.remoteUrl || defaultUrl).replace(/\/+$/, ''),
         subscriptionKey: parsed.subscriptionKey || defaultKey,
-        remoteProjectId: parsed.remoteProjectId || 'proj-bistro-pos'
+        remoteProjectId: parsed.remoteProjectId || 'default'
       };
     }
   } catch {}
   return {
     remoteUrl: defaultUrl.replace(/\/+$/, ''),
     subscriptionKey: defaultKey,
-    remoteProjectId: 'proj-bistro-pos'
+    remoteProjectId: 'default'
   };
 }
 
@@ -940,7 +940,11 @@ VectorForce Harness Configuration:
       case 'push': {
         const remote = getRemoteConfig(cwd);
         const targetUrl = (flags.url || remote.remoteUrl).replace(/\/+$/, '');
-        const remoteProjectId = flags.project || remote.remoteProjectId || 'proj-bistro-pos';
+        if (!targetUrl) {
+          console.error('Error: Remote URL is not configured. Run "vf remote set <CLOUD_URL> --key <SUBSCRIPTION_KEY>" first.');
+          process.exit(1);
+        }
+        const remoteProjectId = flags.project || remote.remoteProjectId || 'default';
         const project = projectService.getProjectForWorkspace(cwd);
         const tasks = store.listTasks(project.project_id);
         const machineId = `${hostname()}-local`;
@@ -1008,7 +1012,11 @@ VectorForce Harness Configuration:
       case 'pull': {
         const remote = getRemoteConfig(cwd);
         const targetUrl = (flags.url || remote.remoteUrl).replace(/\/+$/, '');
-        const remoteProjectId = flags.project || remote.remoteProjectId || 'proj-bistro-pos';
+        if (!targetUrl) {
+          console.error('Error: Remote URL is not configured. Run "vf remote set <CLOUD_URL> --key <SUBSCRIPTION_KEY>" first.');
+          process.exit(1);
+        }
+        const remoteProjectId = flags.project || remote.remoteProjectId || 'default';
 
         console.log(`🔓 Pulling & Decrypting latest context from ${targetUrl} ...`);
         const res = await fetch(`${targetUrl}/api/cloud/sync/pull`, {

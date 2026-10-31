@@ -22,12 +22,7 @@
     "src",
     "studio/dist",
     "AGENTS.md",
-    "CHANGELOG.md",
-    "commandcode.json",
-    "musecode.json",
-    "codex.json",
-    ".agents",
-    ".codex"
+    "CHANGELOG.md"
   ],
   "keywords": [
     "context",

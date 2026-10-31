@@ -290,7 +290,7 @@ export function createStudioServer({
             authorMap.set(name, {
               id: name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
               name,
-              role: name === 'omprakashprajapat' ? 'Lead Architect / Owner' : 'Collaborator',
+              role: 'Contributor',
               harness: cp.author?.harness || 'cli',
               tasks: new Set(),
               checkpointsCount: 0,

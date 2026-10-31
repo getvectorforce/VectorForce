@@ -59,9 +59,11 @@ export default function App() {
         const liveCheckpoints = Array.isArray(timeline?.checkpoints)
           ? [...timeline.checkpoints].reverse().map((cp) => ({
               id: cp.checkpoint_id,
+              checkpoint_id: cp.checkpoint_id,
               task_id: cp.task_id,
               timestamp: cp.timestamp ? new Date(cp.timestamp).toLocaleString() : 'Recent',
               author: `${cp.author?.name || 'developer'} (${cp.author?.harness || 'cli'})`,
+              authorObj: cp.author || { name: 'developer', harness: 'cli' },
               summary: cp.summary || cp.claims?.summary || '',
               commit: cp.evidence?.git?.commit_hash ? cp.evidence.git.commit_hash.slice(0, 7) : 'local',
               branch: cp.evidence?.git?.branch || 'main',

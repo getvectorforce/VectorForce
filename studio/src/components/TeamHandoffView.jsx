@@ -199,35 +199,38 @@ export default function TeamHandoffView({ projectData, onRefreshData }) {
 
       {/* Team Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {authorsToDisplay.map((member) => (
-          <div
-            key={member.name}
-            className="p-5 rounded-2xl glass-panel glass-panel-hover border border-slate-800 space-y-3"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-white text-sm shadow">
-                {member.name.slice(0, 2).toUpperCase()}
+        {authorsToDisplay.map((member, idx) => {
+          const memberName = String(member?.name || `Author ${idx + 1}`);
+          return (
+            <div
+              key={memberName}
+              className="p-5 rounded-2xl glass-panel glass-panel-hover border border-slate-800 space-y-3"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-white text-sm shadow">
+                  {memberName.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">{memberName}</h3>
+                  <p className="text-[11px] text-slate-400 font-medium">{member?.role || 'Contributor'}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">{member.name}</h3>
-                <p className="text-[11px] text-slate-400 font-medium">{member.role || 'Contributor'}</p>
-              </div>
-            </div>
 
-            <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-xs">
-              <div className="flex justify-between items-center text-slate-400">
-                <span>Harness:</span>
-                <span className="text-slate-200 font-semibold">{member.harness || 'cli'}</span>
-              </div>
-              <div className="flex justify-between items-center text-slate-400">
-                <span>Tasks:</span>
-                <span className="text-indigo-400 font-mono text-[11px]">
-                  {Array.isArray(member.tasks) ? member.tasks.join(', ') : (member.activeTask || selectedTask)}
-                </span>
+              <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-xs">
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>Harness:</span>
+                  <span className="text-slate-200 font-semibold">{member?.harness || 'cli'}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>Tasks:</span>
+                  <span className="text-indigo-400 font-mono text-[11px]">
+                    {Array.isArray(member?.tasks) ? member.tasks.join(', ') : (member?.activeTask || selectedTask)}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Selective Context Handoff Generator */}
@@ -303,11 +306,17 @@ export default function TeamHandoffView({ projectData, onRefreshData }) {
               className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
             >
               <option value="">Latest Head Checkpoint (Auto-Resolve)</option>
-              {taskCheckpoints.map(cp => (
-                <option key={cp.checkpoint_id} value={cp.checkpoint_id}>
-                  {cp.checkpoint_id.slice(0, 8)} — [{cp.author?.harness || 'cli'}] {(cp.summary || '').slice(0, 48)}
-                </option>
-              ))}
+              {taskCheckpoints.map((cp, idx) => {
+                const cpId = String(cp?.checkpoint_id || cp?.id || `cp-${idx}`);
+                const authorLabel = typeof cp?.author === 'string'
+                  ? cp.author
+                  : (cp?.author?.harness || cp?.authorObj?.harness || 'cli');
+                return (
+                  <option key={cpId} value={cpId}>
+                    {cpId.slice(0, 8)} — [{authorLabel}] {String(cp?.summary || '').slice(0, 48)}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

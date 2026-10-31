@@ -232,8 +232,12 @@ function parseFlags(args) {
       flags.decisions.push({
         id: parts[0] || 'DEC',
         title: parts[1] || parts[0],
-        rationale: parts[2] || 'Approved architecture decision'
+        rationale: parts.slice(2).join(':') || 'Approved architecture decision'
       });
+    } else if (arg === '--harness' && args[i + 1]) {
+      flags.harness = args[++i];
+    } else if (arg === '--author' && args[i + 1]) {
+      flags.author = args[++i];
     } else if (arg === '--next' && args[i + 1]) {
       flags.nextSteps.push(args[++i]);
     } else if (arg === '--doc' && args[i + 1]) {
@@ -282,8 +286,20 @@ async function main() {
   try {
     switch (command) {
       case 'init': {
-        const name = args[1] || null;
+        const name = args[1] && !args[1].startsWith('--') ? args[1] : null;
         const project = projectService.initProject(cwd, name);
+        HarnessConfig.installAntigravity(cwd);
+        HarnessConfig.installCommandCode(cwd);
+        HarnessConfig.installMuseCode(cwd);
+        HarnessConfig.installCodex(cwd);
+        const agentsMdPath = join(cwd, 'AGENTS.md');
+        if (!existsSync(agentsMdPath)) {
+          writeFileSync(
+            agentsMdPath,
+            `# Agent Continuity Protocol — ${project.name}\n\nThis repository uses **VectorForce** ("Git for AI Context") across Google Antigravity, Meta Muse, Claude Code, Command Code, and OpenAI Codex.\n\n## Workflow\n1. **Start/Resume Task**: Run \`vf tasks active\`, \`vf drift --task <id>\`, and \`vf resume --task <id> --dest <harness>\` (or MCP tools \`list_tasks\`, \`check_workspace_drift\`, \`get_resume_briefing\`, \`reason_about_task\`).\n2. **Save Checkpoint Before Switching IDE**: Run \`vf checkpoint --task <id> --summary "<summary>" --goal "<goal>" --constraint "<constraint>" --decision "<ID>:<Title>:<Rationale>" --next "<next>" --doc "AGENTS.md"\` (or MCP tool \`save_checkpoint\`).\n`,
+            'utf8'
+          );
+        }
         console.log(`Initialized VectorForce project: ${project.name} (${project.project_id})`);
         break;
       }
@@ -300,12 +316,14 @@ async function main() {
           console.log(`Task marked as completed: ${task.title} (${task.task_id}) [${task.status}]`);
           break;
         }
-        const taskId = sub;
+        const isCreateSub = sub === 'create' || sub === 'add';
+        const rawArgs = isCreateSub ? args.slice(2) : args.slice(1);
+        const taskId = rawArgs[0];
         if (!taskId) {
           console.error('Error: task id required (e.g. vf task feat-sqlite "Implement SQLite store")');
           process.exit(1);
         }
-        const title = args.slice(2).join(' ') || taskId;
+        const title = rawArgs.slice(1).join(' ') || taskId;
         const task = projectService.createTask(cwd, taskId, title);
         console.log(`Task registered: ${task.title} (${task.task_id}) [${task.status}]`);
         break;
@@ -362,8 +380,8 @@ async function main() {
           nextSteps: flags.nextSteps,
           requestedDocuments: flags.docs,
           includeGit: flags.includeGit,
-          authorName: process.env.USER || 'developer',
-          authorHarness: 'cli'
+          authorName: flags.author || process.env.VF_AUTHOR || process.env.USER || 'developer',
+          authorHarness: flags.harness || process.env.VF_HARNESS || 'cli'
         });
         console.log(`Checkpoint saved: ${receipt.reference_id} [${receipt.status}]`);
         if (receipt.warnings.length > 0) {

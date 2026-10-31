@@ -20,8 +20,16 @@ import {
 
 export default function AiWorkspaceView({ projectData, initialPrompt }) {
   const [selectedModel, setSelectedModel] = useState('default');
-  const [selectedTask, setSelectedTask] = useState('phase-5-pilot');
-  const [prompt, setPrompt] = useState(initialPrompt || 'Continue OAuth & AI Reasoning implementation');
+  const [selectedTask, setSelectedTask] = useState(
+    projectData?.tasks?.[0]?.task_id || 'phase-5-pilot'
+  );
+  const [prompt, setPrompt] = useState(initialPrompt || 'Analyze current task state, risks, and next engineering actions');
+
+  useEffect(() => {
+    if (projectData?.tasks?.[0]?.task_id) {
+      setSelectedTask(projectData.tasks[0].task_id);
+    }
+  }, [projectData?.tasks]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState('structured'); // 'structured' | 'narrative'
@@ -180,11 +188,13 @@ export default function AiWorkspaceView({ projectData, initialPrompt }) {
               onChange={(e) => setSelectedTask(e.target.value)}
               className="bg-transparent text-xs text-indigo-300 font-mono focus:outline-none cursor-pointer"
             >
-              {(projectData?.tasks?.list || [
-                { task_id: 'phase-5-pilot', title: 'Phase 5: Consented Pilot' },
-                { task_id: 'phase-4-handoff', title: 'Phase 4: Handoff & Safety' },
-                { task_id: 'phase-3-complete', title: 'Phase 3: MCP Integration' }
-              ]).map(t => (
+              {(Array.isArray(projectData?.tasks)
+                ? projectData.tasks
+                : projectData?.tasks?.list || [
+                    { task_id: 'phase-5-pilot', title: 'Phase 5: Consented Pilot' },
+                    { task_id: 'phase-4-handoff', title: 'Phase 4: Handoff & Safety' }
+                  ]
+              ).map(t => (
                 <option key={t.task_id} value={t.task_id} className="bg-slate-900 text-white font-sans">
                   {t.task_id}
                 </option>
@@ -201,11 +211,13 @@ export default function AiWorkspaceView({ projectData, initialPrompt }) {
               onChange={(e) => setSelectedModel(e.target.value)}
               className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
             >
-              <option value="default" className="bg-slate-900 text-white">Configured ({projectData?.ai?.model || 'deepseek/deepseek-v4.1-flash-1017'})</option>
-              <option value="deepseek/deepseek-v4.1-flash-1017" className="bg-slate-900 text-white">DeepSeek V4.1 Flash (OpenRouter)</option>
-              <option value="meta-llama/llama-3.3-70b-instruct" className="bg-slate-900 text-white">Meta Llama 3.3 70B (OpenRouter)</option>
-              <option value="meta-llama/llama-3.1-8b-instruct" className="bg-slate-900 text-white">Meta Llama 3.1 8B (Fast)</option>
-              <option value="llama3.1:8b" className="bg-slate-900 text-white">Local Ollama (llama3.1:8b)</option>
+              <option value="default" className="bg-slate-900 text-white">Configured ({projectData?.ai?.model || 'accounts/fireworks/models/muse-spark-open'})</option>
+              <option value="accounts/fireworks/models/muse-spark-open" className="bg-slate-900 text-white">Muse Spark Open (Fireworks AI · 1M Context)</option>
+              <option value="meta/muse-spark-open" className="bg-slate-900 text-white">Muse Spark Open (OpenRouter)</option>
+              <option value="muse-spark-1.3" className="bg-slate-900 text-white">Meta Muse Direct (muse-spark-1.3)</option>
+              <option value="llama3.3" className="bg-slate-900 text-white">Local Ollama (llama3.3 · 100% Private)</option>
+              <option value="gpt-4.1" className="bg-slate-900 text-white">OpenAI GPT-4.1</option>
+              <option value="claude-sonnet-4-5" className="bg-slate-900 text-white">Anthropic Claude Sonnet 4.5</option>
             </select>
           </div>
         </div>

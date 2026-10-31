@@ -42,73 +42,75 @@ export default function App() {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // Attempt to fetch real live data from VectorForce API server if running
-  useEffect(() => {
-    async function loadLiveData() {
-      try {
-        const [statusRes, memoryRes, timelineRes] = await Promise.all([
-          fetch('/api/status').catch(() => null),
-          fetch('/api/memory').catch(() => null),
-          fetch('/api/timeline?days=30').catch(() => null)
-        ]);
+  // Fetch real live data from VectorForce API server
+  const loadLiveData = async () => {
+    try {
+      const [statusRes, memoryRes, timelineRes] = await Promise.all([
+        fetch('/api/status').catch(() => null),
+        fetch('/api/memory').catch(() => null),
+        fetch('/api/timeline?days=30').catch(() => null)
+      ]);
 
-        const status = statusRes && statusRes.ok ? await statusRes.json() : null;
-        const memory = memoryRes && memoryRes.ok ? await memoryRes.json() : null;
-        const timeline = timelineRes && timelineRes.ok ? await timelineRes.json() : null;
+      const status = statusRes && statusRes.ok ? await statusRes.json() : null;
+      const memory = memoryRes && memoryRes.ok ? await memoryRes.json() : null;
+      const timeline = timelineRes && timelineRes.ok ? await timelineRes.json() : null;
 
-        if (status) {
-          const liveCheckpoints = Array.isArray(timeline?.checkpoints)
-            ? [...timeline.checkpoints].reverse().map((cp) => ({
-                id: cp.checkpoint_id,
-                task_id: cp.task_id,
-                timestamp: cp.timestamp ? new Date(cp.timestamp).toLocaleString() : 'Recent',
-                author: `${cp.author?.name || 'developer'} (${cp.author?.harness || 'cli'})`,
-                summary: cp.summary || cp.claims?.summary || '',
-                commit: cp.evidence?.git?.commit_hash ? cp.evidence.git.commit_hash.slice(0, 7) : 'local',
-                branch: cp.evidence?.git?.branch || 'main',
-                status: 'committed',
-                goals: cp.claims?.goals || [],
-                decisions: (cp.claims?.decisions || []).map((d) => d.id),
-                drift: false
-              }))
-            : null;
+      if (status) {
+        const liveCheckpoints = Array.isArray(timeline?.checkpoints)
+          ? [...timeline.checkpoints].reverse().map((cp) => ({
+              id: cp.checkpoint_id,
+              task_id: cp.task_id,
+              timestamp: cp.timestamp ? new Date(cp.timestamp).toLocaleString() : 'Recent',
+              author: `${cp.author?.name || 'developer'} (${cp.author?.harness || 'cli'})`,
+              summary: cp.summary || cp.claims?.summary || '',
+              commit: cp.evidence?.git?.commit_hash ? cp.evidence.git.commit_hash.slice(0, 7) : 'local',
+              branch: cp.evidence?.git?.branch || 'main',
+              status: 'committed',
+              goals: cp.claims?.goals || [],
+              decisions: (cp.claims?.decisions || []).map((d) => d.id),
+              drift: false
+            }))
+          : null;
 
-          setProjectData((prev) => ({
-            ...prev,
-            project: {
-              ...prev.project,
-              name: status.project.name,
-              id: status.project.id,
-              canonical_path: status.project.path || prev.project.canonical_path
-            },
-            ai: {
-              ...prev.ai,
-              ...(status.ai || {})
-            },
-            tasks: Array.isArray(status.tasks?.list) ? status.tasks.list : prev.tasks,
-            lastCheckpoint: status.lastCheckpoint || prev.lastCheckpoint,
-            checkpoints: liveCheckpoints && liveCheckpoints.length > 0 ? liveCheckpoints : prev.checkpoints,
-            decisions: Array.isArray(memory?.decisions) && memory.decisions.length > 0 ? memory.decisions : prev.decisions,
-            constraints: Array.isArray(memory?.constraints) && memory.constraints.length > 0 ? memory.constraints : prev.constraints,
-            stats: {
-              filesIndexed: memory?.filesIndexed ?? prev.stats.filesIndexed,
-              symbolsIndexed: memory?.symbolsIndexed ?? prev.stats.symbolsIndexed,
-              allowlistedDocs: Array.isArray(memory?.allowedDocuments) ? memory.allowedDocuments.length : prev.stats.allowlistedDocs,
-              checkpointsCount: status.checkpointsCount ?? prev.stats.checkpointsCount,
-              decisionsCount: Array.isArray(memory?.decisions) ? memory.decisions.length : prev.stats.decisionsCount,
-              activeTasks: status.tasks?.active ?? prev.stats.activeTasks
-            },
-            health: {
-              ...prev.health,
-              score: status.health.score,
-              driftDetected: status.health.driftDetected
-            }
-          }));
-        }
-      } catch {
-        // Fallback to rich embedded data
+        setProjectData((prev) => ({
+          ...prev,
+          project: {
+            ...prev.project,
+            name: status.project.name,
+            id: status.project.id,
+            canonical_path: status.project.path || prev.project.canonical_path
+          },
+          ai: {
+            ...prev.ai,
+            ...(status.ai || {})
+          },
+          tasks: Array.isArray(status.tasks?.list) ? status.tasks.list : prev.tasks,
+          allowedDocuments: Array.isArray(memory?.allowedDocuments) ? memory.allowedDocuments : prev.allowedDocuments,
+          lastCheckpoint: status.lastCheckpoint || prev.lastCheckpoint,
+          checkpoints: liveCheckpoints && liveCheckpoints.length > 0 ? liveCheckpoints : prev.checkpoints,
+          decisions: Array.isArray(memory?.decisions) && memory.decisions.length > 0 ? memory.decisions : prev.decisions,
+          constraints: Array.isArray(memory?.constraints) && memory.constraints.length > 0 ? memory.constraints : prev.constraints,
+          stats: {
+            filesIndexed: memory?.filesIndexed ?? prev.stats.filesIndexed,
+            symbolsIndexed: memory?.symbolsIndexed ?? prev.stats.symbolsIndexed,
+            allowlistedDocs: Array.isArray(memory?.allowedDocuments) ? memory.allowedDocuments.length : prev.stats.allowlistedDocs,
+            checkpointsCount: status.checkpointsCount ?? prev.stats.checkpointsCount,
+            decisionsCount: Array.isArray(memory?.decisions) ? memory.decisions.length : prev.stats.decisionsCount,
+            activeTasks: status.tasks?.active ?? prev.stats.activeTasks
+          },
+          health: {
+            ...prev.health,
+            score: status.health.score,
+            driftDetected: status.health.driftDetected
+          }
+        }));
       }
+    } catch {
+      // Fallback to rich embedded data
     }
+  };
+
+  useEffect(() => {
     loadLiveData();
   }, []);
 
@@ -119,13 +121,24 @@ export default function App() {
 
   const handleScanDrift = () => {
     setIsScanningDrift(true);
-    setTimeout(() => {
-      setIsScanningDrift(false);
-      // Toggle or verify drift state
-    }, 600);
+    loadLiveData().finally(() => {
+      setTimeout(() => setIsScanningDrift(false), 500);
+    });
   };
 
-  const handleSaveCheckpoint = (cpData) => {
+  const handleSaveCheckpoint = async (cpData) => {
+    try {
+      const res = await fetch('/api/checkpoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cpData)
+      });
+      if (res.ok) {
+        await loadLiveData();
+        return;
+      }
+    } catch {}
+    // Fallback local state update
     const newId = `cp-${Date.now().toString(16)}`;
     const newCheckpoint = {
       id: newId,
@@ -133,7 +146,7 @@ export default function App() {
       timestamp: 'Just now',
       author: 'You (VectorForce Studio)',
       summary: cpData.summary,
-      commit: '6593b6f',
+      commit: 'local',
       branch: 'main',
       status: 'committed',
       goals: cpData.goals,
@@ -183,6 +196,7 @@ export default function App() {
               onNavigateToTab={setCurrentTab}
               onTriggerReasoning={handleTriggerReasoning}
               onOpenCheckpointModal={() => setIsCheckpointModalOpen(true)}
+              onRefreshData={loadLiveData}
             />
           )}
 
@@ -220,6 +234,7 @@ export default function App() {
               projectData={projectData}
               theme={theme}
               onToggleTheme={toggleTheme}
+              onRefreshData={loadLiveData}
             />
           )}
         </main>
@@ -230,6 +245,7 @@ export default function App() {
         isOpen={isCheckpointModalOpen}
         onClose={() => setIsCheckpointModalOpen(false)}
         onSaveCheckpoint={handleSaveCheckpoint}
+        projectData={projectData}
       />
     </div>
   );

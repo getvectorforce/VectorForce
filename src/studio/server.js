@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SqliteStore } from '../storage/sqlite-store.js';
@@ -11,6 +11,7 @@ import { ReasoningService } from '../operations/reasoning-service.js';
 import { CodeIndexProvider } from '../providers/code-index-provider.js';
 import { LlmProvider, resolveLlmConfig } from '../providers/llm-provider.js';
 import { GitProvider } from '../providers/git-provider.js';
+import { HarnessConfig } from '../mcp/harness-config.js';
 
 export function createStudioServer({
   dbPath,
@@ -380,12 +381,255 @@ export function createStudioServer({
               requestedDocuments: data.requestedDocuments || [],
               includeGit: data.includeGit !== false,
               authorName: data.authorName || 'developer',
-              authorHarness: 'studio'
+              authorHarness: data.authorHarness || 'studio'
             });
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(result));
           } catch (err) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
+      // --- Interactive Studio Configuration & Task/To-Do Endpoints ---
+
+      if (pathname === '/api/config/llm' && req.method === 'GET') {
+        let activeCfg = null;
+        let error = null;
+        try {
+          activeCfg = resolveLlmConfig(process.env, {}, workspacePath);
+        } catch (err) {
+          error = err.message;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          provider: activeCfg?.provider || 'ollama',
+          model: activeCfg?.model || 'llama3.3',
+          baseUrl: activeCfg?.baseUrl || 'http://127.0.0.1:11434',
+          hasApiKey: Boolean(activeCfg?.apiKey),
+          error
+        }));
+        return;
+      }
+
+      if (pathname === '/api/config/llm' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+          try {
+            const data = JSON.parse(body || '{}');
+            const provider = String(data.provider || 'ollama').toLowerCase().trim();
+            const model = String(data.model || '').trim();
+            const baseUrl = String(data.baseUrl || '').trim();
+            const apiKey = String(data.apiKey || '').trim();
+
+            const vfDir = join(workspacePath, '.vectorforce');
+            mkdirSync(vfDir, { recursive: true, mode: 0o700 });
+            const cfgPath = join(vfDir, 'config.json');
+            let existing = {};
+            if (existsSync(cfgPath)) {
+              try { existing = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch {}
+            }
+
+            existing.VF_LLM_PROVIDER = provider;
+            if (provider === 'fireworks') {
+              if (apiKey) existing.FIREWORKS_API_KEY = apiKey;
+              existing.VF_FIREWORKS_MODEL = model || 'accounts/fireworks/models/muse-spark-open';
+              if (baseUrl) existing.VF_FIREWORKS_BASE_URL = baseUrl;
+            } else if (provider === 'muse') {
+              if (apiKey) existing.MODEL_API_KEY = apiKey;
+              existing.VF_MUSE_MODEL = model || 'muse-spark-1.3';
+              if (baseUrl) existing.VF_MUSE_BASE_URL = baseUrl;
+            } else if (provider === 'openrouter') {
+              if (apiKey) existing.OPENROUTER_API_KEY = apiKey;
+              existing.VF_OPENROUTER_MODEL = model || 'meta/muse-spark-open';
+            } else if (provider === 'ollama') {
+              existing.VF_OLLAMA_MODEL = model || 'llama3.3';
+              existing.VF_OLLAMA_BASE_URL = baseUrl || 'http://127.0.0.1:11434';
+            } else if (provider === 'openai' || provider === 'codex') {
+              if (apiKey) existing.VF_LLM_API_KEY = apiKey;
+              existing.VF_LLM_MODEL = model || 'gpt-4.1';
+              existing.VF_LLM_BASE_URL = baseUrl || 'https://api.openai.com/v1';
+            } else if (provider === 'anthropic') {
+              if (apiKey) existing.ANTHROPIC_API_KEY = apiKey;
+              existing.VF_ANTHROPIC_MODEL = model || 'claude-sonnet-4-5';
+              if (baseUrl) existing.VF_ANTHROPIC_BASE_URL = baseUrl;
+            } else if (provider === 'byok') {
+              if (apiKey) existing.VF_LLM_API_KEY = apiKey;
+              if (model) existing.VF_LLM_MODEL = model;
+              if (baseUrl) existing.VF_LLM_BASE_URL = baseUrl;
+            }
+
+            writeFileSync(cfgPath, JSON.stringify(existing, null, 2) + '\n', 'utf8');
+
+            // Hot-reload reasoningService LLM provider
+            let resolved = null;
+            let resolveErr = null;
+            try {
+              resolved = resolveLlmConfig(process.env, {}, workspacePath);
+              reasoningService.llmProvider = new LlmProvider(resolved);
+            } catch (err) {
+              resolveErr = err.message;
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              ok: true,
+              provider: resolved?.provider || provider,
+              model: resolved?.model || model,
+              baseUrl: resolved?.baseUrl || baseUrl,
+              hasApiKey: Boolean(resolved?.apiKey || apiKey),
+              error: resolveErr
+            }));
+          } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
+      if (pathname === '/api/policy' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+          try {
+            const data = JSON.parse(body || '{}');
+            const project = projectService.initProject(workspacePath);
+            const current = store.getDocumentPolicy(project.project_id);
+            let nextList = [...current];
+            if (Array.isArray(data.allowedDocuments)) {
+              nextList = data.allowedDocuments;
+            } else if (data.action === 'remove' && data.path) {
+              nextList = current.filter(p => p !== data.path);
+            } else if (data.path) {
+              if (!nextList.includes(data.path)) nextList.push(data.path);
+            }
+            const updated = store.setDocumentPolicy(project.project_id, nextList);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, allowedDocuments: updated }));
+          } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
+      if (pathname === '/api/config/harnesses' && req.method === 'POST') {
+        try {
+          const agy = HarnessConfig.installAntigravity(workspacePath);
+          const cmd = HarnessConfig.installCommandCode(workspacePath);
+          const muse = HarnessConfig.installMuseCode(workspacePath);
+          const codex = HarnessConfig.installCodex(workspacePath);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: true,
+            installed: [
+              { harness: 'Google Antigravity', path: agy },
+              { harness: 'Claude Code & Command Code', path: cmd },
+              { harness: 'Meta Muse', path: muse },
+              { harness: 'OpenAI Codex CLI', path: codex }
+            ]
+          }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      if (pathname === '/api/tasks' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+          try {
+            const data = JSON.parse(body || '{}');
+            if (data.action === 'status' && data.taskId && data.status) {
+              const updated = projectService.updateTaskStatus(workspacePath, data.taskId, data.status);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true, task: updated }));
+              return;
+            }
+            const taskId = String(data.taskId || '').trim();
+            const title = String(data.title || taskId).trim();
+            if (!taskId) throw new Error('taskId is required');
+            const created = projectService.createTask(workspacePath, taskId, title);
+            res.writeHead(201, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, task: created }));
+          } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
+      if (pathname === '/api/todos' && (req.method === 'GET' || req.method === 'POST')) {
+        const vfDir = join(workspacePath, '.vectorforce');
+        mkdirSync(vfDir, { recursive: true, mode: 0o700 });
+        const todosPath = join(vfDir, 'todos.json');
+
+        const loadTodos = () => {
+          if (existsSync(todosPath)) {
+            try { return JSON.parse(readFileSync(todosPath, 'utf8')); } catch {}
+          }
+          // Auto-seed from latest checkpoint next_steps & goals
+          const project = projectService.initProject(workspacePath);
+          const cps = store.getCheckpoints(project.project_id, { limit: 10 });
+          const latest = cps[cps.length - 1];
+          const seeded = [];
+          if (latest?.claims?.next_steps) {
+            for (const step of latest.claims.next_steps) {
+              seeded.push({
+                id: `todo-${Math.random().toString(36).slice(2, 9)}`,
+                text: step,
+                taskId: latest.task_id,
+                done: false,
+                createdAt: latest.timestamp
+              });
+            }
+          }
+          if (seeded.length > 0) {
+            writeFileSync(todosPath, JSON.stringify(seeded, null, 2) + '\n', 'utf8');
+          }
+          return seeded;
+        };
+
+        if (req.method === 'GET') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ todos: loadTodos() }));
+          return;
+        }
+
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+          try {
+            const data = JSON.parse(body || '{}');
+            let todos = loadTodos();
+            if (data.action === 'add' && data.text) {
+              todos.unshift({
+                id: `todo-${Date.now().toString(36)}`,
+                text: String(data.text).trim(),
+                taskId: data.taskId || 'main',
+                done: false,
+                createdAt: new Date().toISOString()
+              });
+            } else if (data.action === 'toggle' && data.id) {
+              todos = todos.map(t => t.id === data.id ? { ...t, done: !t.done } : t);
+            } else if (data.action === 'delete' && data.id) {
+              todos = todos.filter(t => t.id !== data.id);
+            } else if (Array.isArray(data.todos)) {
+              todos = data.todos;
+            }
+            writeFileSync(todosPath, JSON.stringify(todos, null, 2) + '\n', 'utf8');
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, todos }));
+          } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: err.message }));
           }
         });

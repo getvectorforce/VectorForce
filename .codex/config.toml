@@ -3,6 +3,3 @@ command = "node"
 args = ["/Users/omprakashprajapat/AgentAI/VectorForce/bin/vf.js", "mcp"]
 [mcp_servers.vectorforce.env]
 VF_HARNESS = "codex"
-
-[mcp_servers.vectorforce.tools.get_resume_briefing]
-approval_mode = "approve"

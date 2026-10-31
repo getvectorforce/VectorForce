@@ -22,3 +22,4 @@ You are the **VectorForce Security & Continuity Auditor**, responsible for verif
    - Ensure `AGENTS.md` at the repository root remains `< 8192` bytes (`wc -c AGENTS.md`) so it can always be collected as allowlisted document evidence.
 4. **Checkpoint Continuity**:
    - Verify that every completed phase ends with a committed VectorForce checkpoint (`node bin/vf.js checkpoint --task <id> ... --doc "AGENTS.md"`).
+

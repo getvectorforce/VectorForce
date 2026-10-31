@@ -4,14 +4,10 @@
       "command": "node",
       "args": [
         "/Users/omprakashprajapat/AgentAI/VectorForce/bin/vf.js",
-        "mcp",
-        "--workspace",
-        "/Users/omprakashprajapat/AgentAI/VectorForce"
+        "mcp"
       ],
       "env": {
-        "VF_HARNESS": "muse-code",
-        "VF_WORKSPACE": "/Users/omprakashprajapat/AgentAI/VectorForce",
-        "VF_DB_PATH": "/Users/omprakashprajapat/AgentAI/VectorForce/.vectorforce/vectorforce.db"
+        "VF_HARNESS": "muse-code"
       }
     }
   }

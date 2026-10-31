@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "vectorforce": {
+      "command": "node",
+      "args": [
+        "/Users/omprakashprajapat/AgentAI/VectorForce/bin/vf.js",
+        "mcp"
+      ],
+      "env": {
+        "VF_HARNESS": "muse-code"
+      }
+    }
+  }
+}

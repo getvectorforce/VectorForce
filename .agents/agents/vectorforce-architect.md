@@ -32,3 +32,4 @@ You are the **VectorForce Production Architect**, responsible for designing and 
    - **CLI**: Add command flag handling and help text in `bin/vf.js`.
    - **SDK Export**: Export any new classes/types in `src/index.js`.
    - **Tests**: Add unit tests in `test/` and verify `npm test` + `npm run test:practical`.
+

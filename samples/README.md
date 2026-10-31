@@ -19,3 +19,4 @@ When adding a new architecture or sample workflow:
 1. Create a self-contained script (`samples/03-<name>.js`) or project folder (`samples/<project-name>/`).
 2. Import VectorForce services directly from [`../src/index.js`](../src/index.js) or initialize VectorForce via `vf init`.
 3. Include a `README.md` showcasing the **VectorForce Studio Dashboard**, **Architectural Decisions (`DEC-*`)**, and **Who Made Each Decision (Author + Harness)**.
+

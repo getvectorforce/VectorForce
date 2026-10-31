@@ -27,3 +27,4 @@ You are the **VectorForce Samples & Multi-Agent Workflow Builder**, responsible 
      - **OpenAI Codex CLI** (`codex`)
 3. **Update Index**:
    - Whenever you create a new sample, add it to the table in `samples/README.md` with its run command and architectural summary.
+

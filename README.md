@@ -73,7 +73,24 @@ node bin/vf.js checkpoint --task auth-module \
   --doc "AGENTS.md"
 ```
 
-### 5. Reason Over Context (AI Engineering Memory)
+### 5. Multi-Machine & Team Cloud Sync (`vf remote`, `vf push`, `vf pull`)
+
+VectorForce follows the Git mental model for sharing context between two computers or across a team using Zero-Knowledge End-to-End Encryption (`X25519` + `AES-256-GCM` + `Ed25519`):
+
+```bash
+# 1. Connect local workspace to your Cloud Remote once:
+node bin/vf.js remote set https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run \
+  --key vf_live_sub_98a7bc65f012e4d9 \
+  --project proj-bistro-pos
+
+# 2. Push local checkpoints & tasks to Cloud (E2EE):
+node bin/vf.js push
+
+# 3. Pull & reconcile context on Computer 2 (reconciles into SQLite & runs Meta Muse reasoning):
+node bin/vf.js pull
+```
+
+### 6. Reason Over Context (AI Engineering Memory)
 
 VectorForce prioritizes **Meta Muse (`muse-spark-1.3`)** and the open-weights **Meta Muse Spark Open (`muse-spark-open` • 1M token context window)** as its **#1 reasoning models**, while also supporting **Fireworks AI**, **OpenRouter**, **Local Ollama**, **OpenAI / Codex**, **Anthropic Claude**, and any **Custom BYOK** OpenAI-compatible endpoint:
 

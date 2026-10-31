@@ -3,6 +3,7 @@ node_modules/
 .vectorforce/
 tmp/
 vectorforcewebsite/
+wiki/
 *.db
 *.db-wal
 *.db-shm

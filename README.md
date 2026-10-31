@@ -186,19 +186,6 @@ VF_HARNESS = "codex"
 
 ---
 
-## Architecture Decision Records (ADR)
-
-All design decisions are formalized in the [`wiki/`](wiki/README.md):
-
-- [ADR-001: Event-driven context architecture](wiki/decisions/adr-001-event-driven-harness-independent-context-architecture.md)
-- [ADR-002: Local-first checkpoints & disclosure boundaries](wiki/decisions/adr-002-local-first-checkpoints-and-disclosure-boundaries.md)
-- [ADR-003: Portable checkpoints & cross-harness resume](wiki/decisions/adr-003-portable-checkpoints-and-cross-harness-resume.md)
-- [ADR-012: Target harnesses: Antigravity & Command Code](wiki/decisions/adr-012-target-harness-selection-antigravity-commandcode-pidev.md)
-- [ADR-013: AI reasoning layer & model provider authorization](wiki/decisions/adr-013-ai-reasoning-layer-and-provider-authorization.md)
-- [ADR-014: VectorForce Studio & local topology visualizer](wiki/decisions/adr-014-vectorforce-studio-and-local-topology-visualizer.md)
-
----
-
 ## Verification & Cross-OS Test Suite (Linux, macOS, Windows)
 
 Run the full automated test suite (75 unit & security tests) and the 7-stage practical multi-developer environment simulation:

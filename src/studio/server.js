@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, extname } from 'node:path';
+import { homedir } from 'node:os';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { SqliteStore } from '../storage/sqlite-store.js';
 import { ProjectService } from '../operations/project-service.js';
@@ -320,12 +322,74 @@ export function createStudioServer({
         req.on('end', async () => {
           try {
             const data = JSON.parse(body || '{}');
+            const project = projectService.getProjectForWorkspace(workspacePath);
+            const allTasks = store.listTasks(project.project_id);
+
+            let resolvedTaskId = data.taskId;
+            if (!resolvedTaskId || !allTasks.some(t => t.task_id === resolvedTaskId)) {
+              const activeTask = allTasks.find(t => t.status === 'active') || allTasks[0];
+              if (activeTask) {
+                resolvedTaskId = activeTask.task_id;
+              }
+            }
+
+            let resolvedCheckpointId = data.checkpointId || undefined;
+            if (!resolvedCheckpointId && resolvedTaskId) {
+              const leaves = store.getLeafCheckpoints(project.project_id, resolvedTaskId);
+              if (leaves.length > 1) {
+                const sorted = [...leaves].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                resolvedCheckpointId = sorted[0].checkpoint_id;
+              }
+            }
+
             const result = handoffService.exportHandoff({
               workspacePath,
-              taskId: data.taskId || 'phase-5-pilot',
-              checkpointId: data.checkpointId || undefined,
+              taskId: resolvedTaskId || 'phase-5-pilot',
+              checkpointId: resolvedCheckpointId,
               recipient: data.recipient || 'Collaborator',
               destinationHarness: data.destinationHarness || 'any'
+            });
+
+            const bundle = {
+              schema_version: 'vectorforce/handoff-bundle/v1',
+              package_id: result.package_id,
+              created_at: result.handoff?.created_at || new Date().toISOString(),
+              manifest: result.manifest,
+              handoff: result.handoff
+            };
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ...result, bundle }));
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
+        return;
+      }
+
+      if (pathname === '/api/handoff/import' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const data = JSON.parse(body || '{}');
+            let targetBundlePath = data.bundlePath;
+
+            if (!targetBundlePath && data.bundleContent) {
+              const handoffsDir = join(homedir(), '.vectorforce', 'handoffs');
+              mkdirSync(handoffsDir, { recursive: true, mode: 0o700 });
+              const rawStr = typeof data.bundleContent === 'string'
+                ? data.bundleContent
+                : JSON.stringify(data.bundleContent, null, 2);
+              targetBundlePath = join(handoffsDir, `import-${randomUUID().slice(0, 8)}.vfhandoff.json`);
+              writeFileSync(targetBundlePath, rawStr, 'utf8');
+            }
+
+            const result = handoffService.importHandoff({
+              workspacePath,
+              bundlePath: targetBundlePath,
+              targetTaskId: data.targetTaskId || undefined
             });
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(result));

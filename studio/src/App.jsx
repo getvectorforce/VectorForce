@@ -226,7 +226,10 @@ export default function App() {
           )}
 
           {currentTab === 'team' && (
-            <TeamHandoffView projectData={projectData} />
+            <TeamHandoffView
+              projectData={projectData}
+              onRefreshData={loadLiveData}
+            />
           )}
 
           {currentTab === 'settings' && (

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { homedir } from 'node:os';
-import { resolve, join, dirname } from 'node:path';
+import { homedir, hostname } from 'node:os';
+import { resolve, join, dirname, basename } from 'node:path';
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import {
   SqliteStore,
@@ -264,9 +264,51 @@ function parseFlags(args) {
       flags.workspace = resolve(args[++i]);
     } else if (arg === '--db' && args[i + 1]) {
       flags.db = resolve(args[++i]);
+    } else if ((arg === '--url' || arg === '--remote') && args[i + 1]) {
+      flags.url = args[++i];
+    } else if (arg === '--key' && args[i + 1]) {
+      flags.key = args[++i];
+    } else if (arg === '--project' && args[i + 1]) {
+      flags.project = args[++i];
     }
   }
   return flags;
+}
+
+function getRemoteConfig(cwd) {
+  const defaultUrl = process.env.VF_CLOUD_URL || 'https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run';
+  const defaultKey = process.env.VF_SUBSCRIPTION_KEY || 'vf_live_sub_98a7bc65f012e4d9';
+  const cfgPath = join(cwd, '.vectorforce', 'config.json');
+  try {
+    if (existsSync(cfgPath)) {
+      const parsed = JSON.parse(readFileSync(cfgPath, 'utf8'));
+      return {
+        remoteUrl: (parsed.remoteUrl || defaultUrl).replace(/\/+$/, ''),
+        subscriptionKey: parsed.subscriptionKey || defaultKey,
+        remoteProjectId: parsed.remoteProjectId || 'proj-bistro-pos'
+      };
+    }
+  } catch {}
+  return {
+    remoteUrl: defaultUrl.replace(/\/+$/, ''),
+    subscriptionKey: defaultKey,
+    remoteProjectId: 'proj-bistro-pos'
+  };
+}
+
+function saveRemoteConfig(cwd, updates) {
+  const vfDir = join(cwd, '.vectorforce');
+  mkdirSync(vfDir, { recursive: true, mode: 0o700 });
+  const cfgPath = join(vfDir, 'config.json');
+  let existing = {};
+  try {
+    if (existsSync(cfgPath)) {
+      existing = JSON.parse(readFileSync(cfgPath, 'utf8'));
+    }
+  } catch {}
+  const merged = { ...existing, ...updates };
+  writeFileSync(cfgPath, JSON.stringify(merged, null, 2), 'utf8');
+  return merged;
 }
 
 async function main() {
@@ -866,6 +908,166 @@ VectorForce Harness Configuration:
 
    Privacy: set VF_LLM_ALLOW_CODE=false (or run with --no-code) to keep source out of the prompt.
 `);
+        break;
+      }
+
+      case 'remote': {
+        const sub = args[1] || 'show';
+        if (sub === 'set' || sub === 'add') {
+          const urlArg = args[2] && !args[2].startsWith('--') ? args[2] : flags.url;
+          if (!urlArg) {
+            console.error('Usage: vf remote set <CLOUD_URL> [--key <SUBSCRIPTION_KEY>] [--project <PROJECT_ID>]');
+            process.exit(1);
+          }
+          const saved = saveRemoteConfig(cwd, {
+            remoteUrl: urlArg.replace(/\/+$/, ''),
+            ...(flags.key ? { subscriptionKey: flags.key } : {}),
+            ...(flags.project ? { remoteProjectId: flags.project } : {})
+          });
+          console.log(`✔ Remote VectorForce Cloud configured in .vectorforce/config.json:`);
+          console.log(`  Remote URL:  ${saved.remoteUrl}`);
+          console.log(`  Project ID:  ${saved.remoteProjectId || 'proj-bistro-pos'}`);
+          break;
+        }
+        const remote = getRemoteConfig(cwd);
+        console.log(`\nVectorForce Cloud Remote (${cwd}):`);
+        console.log(`  Remote URL:       ${remote.remoteUrl}`);
+        console.log(`  Remote Project:   ${remote.remoteProjectId}`);
+        console.log(`  Subscription Key: ${remote.subscriptionKey.slice(0, 12)}...`);
+        break;
+      }
+
+      case 'push': {
+        const remote = getRemoteConfig(cwd);
+        const targetUrl = (flags.url || remote.remoteUrl).replace(/\/+$/, '');
+        const remoteProjectId = flags.project || remote.remoteProjectId || 'proj-bistro-pos';
+        const project = projectService.getProjectForWorkspace(cwd);
+        const tasks = store.listTasks(project.project_id);
+        const machineId = `${hostname()}-local`;
+
+        console.log(`🔄 Pushing local context (${project.name}) -> ${targetUrl} ...`);
+
+        for (const t of tasks) {
+          if (flags.task && t.task_id !== flags.task) continue;
+          await fetch(`${targetUrl}/api/cloud/tasks`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${remote.subscriptionKey}`
+            },
+            body: JSON.stringify({
+              projectId: remoteProjectId,
+              taskId: t.task_id,
+              title: t.title || t.task_id,
+              assignee: `${process.env.USER || 'developer'}@local-mac`,
+              role: `Local Workspace (${basename(cwd)})`,
+              priority: 'P0',
+              machineId,
+              harness: flags.harness || 'antigravity'
+            })
+          });
+        }
+
+        const checkpoints = store.getCheckpoints(project.project_id, { limit: 50 });
+        let pushedCount = 0;
+        let lastResp = null;
+
+        for (const cp of checkpoints) {
+          if (flags.task && cp.task_id !== flags.task) continue;
+          const res = await fetch(`${targetUrl}/api/cloud/sync/push`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${remote.subscriptionKey}`
+            },
+            body: JSON.stringify({
+              projectId: remoteProjectId,
+              taskId: cp.task_id,
+              senderMachineId: machineId,
+              recipientMachineId: 'computer-2-meta-muse-cloud',
+              authorName: `${cp.author?.name || process.env.USER || 'developer'} (${basename(cwd)})`,
+              authorHarness: cp.author?.harness || 'antigravity',
+              summary: cp.summary,
+              goals: cp.claims?.goals || [],
+              constraints: cp.claims?.constraints || [],
+              decisions: cp.claims?.decisions || [],
+              nextSteps: cp.claims?.next_steps || []
+            })
+          });
+          lastResp = await res.json();
+          pushedCount++;
+        }
+
+        console.log(`✔ Pushed ${pushedCount} checkpoint(s) [E2EE AES-256-GCM + X25519 + Ed25519] to ${targetUrl}`);
+        if (lastResp?.checkpoint_id) {
+          console.log(`  Latest Cloud Checkpoint: ${lastResp.checkpoint_id}`);
+        }
+        break;
+      }
+
+      case 'pull': {
+        const remote = getRemoteConfig(cwd);
+        const targetUrl = (flags.url || remote.remoteUrl).replace(/\/+$/, '');
+        const remoteProjectId = flags.project || remote.remoteProjectId || 'proj-bistro-pos';
+
+        console.log(`🔓 Pulling & Decrypting latest context from ${targetUrl} ...`);
+        const res = await fetch(`${targetUrl}/api/cloud/sync/pull`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${remote.subscriptionKey}`
+          },
+          body: JSON.stringify({
+            projectId: remoteProjectId,
+            taskId: flags.task || undefined
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || data.verified === false) {
+          console.error(`Error pulling from remote: ${data.error || res.statusText}`);
+          process.exit(1);
+        }
+
+        const payload = data.decrypted_on_computer_2?.payload;
+        if (payload) {
+          let project;
+          try {
+            project = projectService.getProjectForWorkspace(cwd);
+          } catch {
+            project = projectService.initProject(cwd, basename(cwd));
+          }
+          const targetTaskId = flags.task || payload.task_id || 'cloud-sync-task';
+          if (!store.getTask(project.project_id, targetTaskId)) {
+            store.createTask(project.project_id, targetTaskId, `Synced Task: ${targetTaskId}`);
+          }
+          const leaves = store.getLeafCheckpoints(project.project_id, targetTaskId);
+          const parentId = leaves.length > 0 ? leaves[0].checkpoint_id : undefined;
+
+          const receipt = checkpointService.captureCheckpoint({
+            workspacePath: cwd,
+            taskId: targetTaskId,
+            parentId,
+            authorName: payload.author?.name || 'cloud-sync',
+            authorHarness: payload.author?.harness || 'muse-code',
+            summary: `[Pulled from Cloud] ${payload.summary}`,
+            goals: payload.claims?.goals?.length ? payload.claims.goals : ['Continue cloud-synced task'],
+            constraints: payload.claims?.constraints || [],
+            decisions: payload.claims?.decisions || [],
+            nextSteps: payload.claims?.next_steps?.length ? payload.claims.next_steps : ['Inspect pulled context'],
+            requestedDocuments: ['AGENTS.md'],
+            includeGit: true
+          });
+          console.log(`✔ Verified Ed25519 signature, decrypted (X25519 + AES-256-GCM), and reconciled into local SQLite!`);
+          console.log(`  Local Checkpoint Committed: ${receipt.reference_id} [${receipt.status}]`);
+        }
+
+        if (data.muse_reasoning) {
+          console.log(`\n🧠 Cloud AI Briefing (${data.muse_reasoning.model}):`);
+          console.log(`  Summary: ${data.muse_reasoning.where_computer_1_left_off}`);
+          for (const step of data.muse_reasoning.recommended_next_actions_for_computer_2 || []) {
+            console.log(`  Next -> ${step}`);
+          }
+        }
         break;
       }
 

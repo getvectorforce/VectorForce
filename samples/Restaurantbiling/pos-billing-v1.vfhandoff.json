@@ -1,0 +1,89 @@
+{
+  "schema_version": "vectorforce/handoff-bundle/v1",
+  "package_id": "hand-22736ac7bb55022e",
+  "created_at": "2026-10-31T12:54:00.209Z",
+  "manifest": {
+    "schema_version": "vectorforce/manifest/v1",
+    "package_id": "hand-22736ac7bb55022e",
+    "created_at": "2026-10-31T12:54:00.209Z",
+    "files": [
+      {
+        "path": "handoff.json",
+        "sha256": "3014ee74f8025ceaacaba058272394e8629cf6e0b9e08df7a905a8cee3ab2c97",
+        "size_bytes": 5849
+      }
+    ]
+  },
+  "handoff": {
+    "schema_version": "vectorforce/handoff/v1",
+    "package_id": "hand-22736ac7bb55022e",
+    "created_at": "2026-10-31T12:54:00.209Z",
+    "origin": {
+      "project_name": "Restaurant Billing Center",
+      "task_id": "pos-billing-v1",
+      "task_title": "Build Restaurant Billing Center (Backend API + POS Frontend)",
+      "checkpoint_id": "c84524f7-9169-4af0-a191-fb3ac7057c6d"
+    },
+    "disclosure": {
+      "recipient": "qa-lead",
+      "destination_harness": "command-code"
+    },
+    "checkpoint": {
+      "summary": "Step 2 completed in Meta Muse (muse-code): Built interactive BistroForce POS Frontend (index.html, styles.css, app.js) and HTTP E2E integration test",
+      "claims": {
+        "goals": [
+          "Build interactive POS ordering UI with category tabs, veg filter, promo chips, and thermal receipt modal",
+          "Enforce server-authoritative billing preview via POST /api/bills/preview"
+        ],
+        "constraints": [
+          "Zero external database dependencies (use pure in-memory store)",
+          "All currency calculations must use integer-cent math to prevent floating-point rounding drift",
+          "Frontend must never duplicate tax/discount rounding math; always use POST /api/bills/preview"
+        ],
+        "decisions": [
+          {
+            "id": "DEC-POS-01",
+            "title": "ServerAuthoritativePreview",
+            "rationale": "Frontend delegates all subtotal, promo, and 5% GST calculations to POST /api/bills/preview"
+          },
+          {
+            "id": "DEC-POS-02",
+            "title": "ThermalReceiptModal",
+            "rationale": "Render printable courier-font tax invoice modal (INV-1001) on checkout and refresh topbar KPIs"
+          }
+        ],
+        "next_steps": [
+          "Switch to Command Code / Claude Code for Step 3: Export signed handoff package, inspect VectorForce Studio dashboard, and document full decision lineage in README.md"
+        ],
+        "open_questions": []
+      },
+      "evidence": {
+        "git": {
+          "commit_hash": "ebd31e438c4b3cc8ac51d4658096fe3e0434ef09",
+          "branch": "main",
+          "is_dirty": false,
+          "collected_at": "2026-10-31T12:53:39.489Z"
+        },
+        "documents": [
+          {
+            "path": "AGENTS.md",
+            "sha256": "d1736d506aae9e054712e41b918de401d5fa822cbe758794dfa0202530911cfa",
+            "size_bytes": 679,
+            "collected_at": "2026-10-31T12:53:39.493Z",
+            "content": "# Agent Continuity Protocol — Restaurant Billing Center\n\nThis repository uses **VectorForce** (\"Git for AI Context\") across Google Antigravity, Meta Muse, Claude Code, Command Code, and OpenAI Codex.\n\n## Workflow\n1. **Start/Resume Task**: Run `vf tasks active`, `vf drift --task <id>`, and `vf resume --task <id> --dest <harness>` (or MCP tools `list_tasks`, `check_workspace_drift`, `get_resume_briefing`, `reason_about_task`).\n2. **Save Checkpoint Before Switching IDE**: Run `vf checkpoint --task <id> --summary \"<summary>\" --goal \"<goal>\" --constraint \"<constraint>\" --decision \"<ID>:<Title>:<Rationale>\" --next \"<next>\" --doc \"AGENTS.md\"` (or MCP tool `save_checkpoint`).\n",
+            "untrusted_content": true
+          },
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "0a16f45494da3d3d59cf267471d280b1b9d02bd3af7b27eaa357e46e22411962",
+            "size_bytes": 2372,
+            "collected_at": "2026-10-31T12:53:39.493Z",
+            "content": "# Restaurant Billing Center — Architecture & Step-by-Step Plan\n\n## 1. Overview\nA clean, zero-database Restaurant POS & Billing Center demonstrating how **VectorForce** preserves engineering decisions, constraints, and context across multiple AI coding tools (**Google Antigravity**, **Meta Muse**, **Claude Code / Command Code**, and **OpenAI Codex**).\n\n## 2. System Boundaries\n- **Backend (`backend/`)**:\n  - `backend/menu-data.js`: Curated restaurant menu (Starters, Mains, Wood-Fired Pizza, Beverages, Desserts) and valid promo codes (`WELCOME10`, `FEAST20`).\n  - `backend/billing-engine.js`: Pure, deterministic billing engine (calculates line-item subtotals, promo discounts, 5% GST tax, and grand total with 2-decimal precision; stores active/paid bills in memory).\n  - `backend/server.js`: Zero-dependency Node.js HTTP server (`http://127.0.0.1:4000`) serving both the REST API and the static `frontend/` POS interface.\n- **Frontend (`frontend/`)**:\n  - `frontend/index.html`, `frontend/styles.css`, `frontend/app.js`: Interactive Restaurant POS where staff/customers browse categories, add items to the table order, apply promo codes, generate an itemized bill receipt, and mark bills as paid.\n\n## 3. REST API Contract (`http://127.0.0.1:4000`)\n- `GET /api/menu` -> Returns `{ categories, items, promoCodes }`.\n- `POST /api/bills/preview` -> Body `{ items: [{ id, qty }], promoCode }` -> Returns calculated breakdown `{ subtotal, discount, taxRate, taxAmount, grandTotal, lineItems }`.\n- `POST /api/bills` -> Body `{ tableNumber, customerName, items, promoCode, paymentMethod }` -> Creates and stores a finalized bill with unique invoice number (`INV-1001`).\n- `GET /api/bills` -> Returns all recent bills and daily revenue summary.\n\n## 4. Multi-Harness Step-by-Step Workflow\n- **Step 1 (Google Antigravity)**: Initialize VectorForce (`vf init`), build the Backend Billing Engine & REST API (`backend/`), verify unit tests (`test/billing.test.js`), and capture **Checkpoint #1**.\n- **Step 2 (Switch IDE / CLI — Meta Muse, Claude Code, Command Code, or Codex)**: Run `vf resume` / `vf reason`, build the Interactive POS Frontend (`frontend/`), and capture **Checkpoint #2**.\n- **Step 3 (VectorForce Studio & README Showcase)**: Launch `vf studio`, inspect the topology graph and decision timeline, and embed the Studio dashboard & decision log in `README.md`.\n\n",
+            "untrusted_content": true
+          }
+        ],
+        "gaps": []
+      }
+    }
+  }
+}

@@ -869,6 +869,20 @@ VectorForce Harness Configuration:
         break;
       }
 
+      case 'recap':
+      case 'timeline': {
+        const flags = parseFlags(args.slice(1));
+        const days = flags.days ? parseInt(flags.days, 10) : 7;
+        const recap = briefingService.generateRecap({
+          workspacePath: cwd,
+          days,
+          taskId: flags.task,
+          destination: flags.dest || 'cli'
+        });
+        console.log(recap.recapText);
+        break;
+      }
+
       case 'doctor':
       case 'status': {
         const checks = [
@@ -895,13 +909,13 @@ VectorForce Harness Configuration:
         const flags = parseFlags(args.slice(1));
         const port = flags.port || 3210;
         const studio = createStudioServer({
-          dbPath: getDbPath(),
+          dbPath: getDbPath(cwd),
           workspacePath: cwd,
           port
         });
         const url = await studio.start();
         console.log(`\n🚀 VectorForce Studio is running at: ${url}`);
-        console.log(`   Connected to SQLite: ${getDbPath()}`);
+        console.log(`   Connected to SQLite: ${getDbPath(cwd)}`);
         console.log(`   Interactive Topology & AI Memory: ${url}`);
         console.log(`   Press Ctrl+C to stop.\n`);
 

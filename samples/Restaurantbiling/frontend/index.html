@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BistroForce POS — Restaurant Billing Center</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">🍽️</div>
+      <div>
+        <h1>BistroForce POS <span class="badge-vf">VectorForce Tracked · pos-billing-v1</span></h1>
+        <p>Zero-DB Restaurant Ordering &amp; Deterministic Billing Center</p>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <div class="kpi-card">
+        <span class="kpi-label">Today's Revenue</span>
+        <strong id="kpi-revenue">$0.00</strong>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Invoices Issued</span>
+        <strong id="kpi-bills">0</strong>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">5% GST Collected</span>
+        <strong id="kpi-tax">$0.00</strong>
+      </div>
+    </div>
+  </header>
+
+  <main class="pos-layout">
+    <!-- Left Column: Menu & Category Browser -->
+    <section class="menu-section">
+      <div class="menu-Controls">
+        <div id="category-tabs" class="category-tabs"></div>
+        <label class="veg-toggle">
+          <input type="checkbox" id="veg-only-checkbox" />
+          <span>🌿 Veg Only</span>
+        </label>
+      </div>
+
+      <div id="menu-grid" class="menu-grid"></div>
+
+      <!-- Recent Bills Ledger -->
+      <div class="ledger-panel">
+        <div class="ledger-header">
+          <h2>Recent Paid Invoices</h2>
+          <span class="subtext">In-Memory Ledger (DEC-BILL-01)</span>
+        </div>
+        <div id="invoices-list" class="invoices-list">
+          <p class="empty-state">No invoices generated yet. Add items on the right to issue your first bill.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Active Table Cart & Live Bill Calculator -->
+    <aside class="billing-sidebar">
+      <div class="sidebar-header">
+        <h2>Current Table Bill</h2>
+        <button id="clear-cart-btn" class="btn-ghost" type="button">Clear</button>
+      </div>
+
+      <div class="guest-meta">
+        <div class="field">
+          <label for="table-select">Table #</label>
+          <select id="table-select">
+            <option value="T-01">Table T-01 (Window)</option>
+            <option value="T-02">Table T-02 (Patio)</option>
+            <option value="T-03">Table T-03 (Booth)</option>
+            <option value="T-04">Table T-04 (Center)</option>
+            <option value="T-05">Table T-05 (Private)</option>
+            <option value="TAKEAWAY">Takeaway Counter</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="customer-input">Guest Name</label>
+          <input id="customer-input" type="text" placeholder="Walk-in Guest" value="Walk-in Guest" />
+        </div>
+      </div>
+
+      <div id="cart-items" class="cart-items">
+        <p class="empty-cart">Select dishes from the menu to start billing.</p>
+      </div>
+
+      <!-- Promo Code Selector -->
+      <div class="promo-box">
+        <label for="promo-input">Promo Code (Applied before 5% GST — DEC-BILL-03)</label>
+        <div class="promo-row">
+          <input id="promo-input" type="text" placeholder="e.g. WELCOME10 or FEAST20" />
+          <button id="apply-promo-btn" type="button" class="btn-secondary">Apply</button>
+        </div>
+        <div class="promo-chips">
+          <button type="button" class="promo-chip" data-code="WELCOME10">WELCOME10 (10% Off)</button>
+          <button type="button" class="promo-chip" data-code="FEAST20">FEAST20 (20% ≥ $40)</button>
+          <button type="button" class="promo-chip" data-code="FLAT5">FLAT5 ($5 ≥ $25)</button>
+        </div>
+        <p id="promo-feedback" class="promo-feedback"></p>
+      </div>
+
+      <!-- Totals Breakdown -->
+      <div class="bill-summary">
+        <div class="summary-row">
+          <span>Subtotal (<span id="summary-count">0</span> items)</span>
+          <strong id="summary-subtotal">$0.00</strong>
+        </div>
+        <div class="summary-row discount-row">
+          <span>Promo Discount</span>
+          <strong id="summary-discount">-$0.00</strong>
+        </div>
+        <div class="summary-row">
+          <span>Taxable Amount</span>
+          <span id="summary-taxable">$0.00</span>
+        </div>
+        <div class="summary-row">
+          <span>Restaurant GST (5%)</span>
+          <strong id="summary-tax">$0.00</strong>
+        </div>
+        <div class="summary-row grand-total-row">
+          <span>Grand Total</span>
+          <strong id="summary-grand">$0.00</strong>
+        </div>
+      </div>
+
+      <div class="payment-row">
+        <label>Payment Mode</label>
+        <div class="payment-modes">
+          <button type="button" class="pay-mode active" data-mode="Card">💳 Card</button>
+          <button type="button" class="pay-mode" data-mode="UPI / QR">📱 UPI / QR</button>
+          <button type="button" class="pay-mode" data-mode="Cash">💵 Cash</button>
+        </div>
+      </div>
+
+      <button id="checkout-btn" type="button" class="btn-primary" disabled>
+        Generate Official Invoice &amp; Print Bill
+      </button>
+    </aside>
+  </main>
+
+  <!-- Printable Receipt Modal -->
+  <div id="receipt-modal" class="modal-backdrop hidden">
+    <div class="receipt-card">
+      <div class="receipt-header">
+        <h3>BISTROFORCE RESTAURANT</h3>
+        <p>Tax Invoice &amp; Official Payment Receipt</p>
+        <div class="receipt-meta" id="receipt-meta"></div>
+      </div>
+      <div class="receipt-body" id="receipt-body"></div>
+      <div class="receipt-footer">
+        <button id="print-receipt-btn" type="button" class="btn-secondary">🖨️ Print Receipt</button>
+        <button id="close-receipt-btn" type="button" class="btn-primary">Done &amp; Next Order</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

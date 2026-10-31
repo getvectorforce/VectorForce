@@ -1,0 +1,16 @@
+{
+  "name": "restaurant-billing-center",
+  "version": "1.0.0",
+  "description": "Simplified Restaurant POS & Billing Center — Built step-by-step across AI IDEs using VectorForce",
+  "type": "module",
+  "scripts": {
+    "start": "node backend/server.js",
+    "test": "node --test test/billing.test.js",
+    "vf:status": "vf status",
+    "vf:studio": "vf studio"
+  },
+  "devDependencies": {
+    "vectorforce": "file:../VectorForce"
+  }
+}
+

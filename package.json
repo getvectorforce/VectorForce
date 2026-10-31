@@ -21,7 +21,6 @@
     "bin",
     "src",
     "studio/dist",
-    "AGENTS.md",
     "CHANGELOG.md"
   ],
   "keywords": [

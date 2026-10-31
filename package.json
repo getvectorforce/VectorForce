@@ -9,6 +9,8 @@
     "vectorforce": "bin/vf.js"
   },
   "scripts": {
+    "build": "npm --prefix studio run build",
+    "prepublishOnly": "npm --prefix studio run build && npm test",
     "test": "node --test \"test/**/*.test.js\"",
     "test:practical": "node scripts/practical-test-env.js"
   },

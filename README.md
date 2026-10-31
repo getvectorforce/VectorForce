@@ -137,7 +137,7 @@ node bin/vf.js studio
 
 ## Model Context Protocol (MCP)
 
-VectorForce exposes a standard stdio JSON-RPC MCP server for direct integration into **Google Antigravity**, **Claude Code**, **Command Code**, **Meta Muse**, and **OpenAI Codex**.
+VectorForce exposes a standard stdio JSON-RPC MCP server for direct integration into **Google Antigravity**, **Claude Code**, **Command Code**, **Meta Muse**, **OpenAI Codex**, **Cursor**, **Windsurf**, **GitHub Copilot**, and **Kiro IDE**.
 
 > **How MCP Starts:** You **never** need to run `vf mcp` manually in a terminal. Each AI coding agent reads its configuration file below and automatically spawns VectorForce in the background over `stdio`.
 
@@ -148,17 +148,21 @@ VectorForce exposes a standard stdio JSON-RPC MCP server for direct integration 
 | **Command Code (`cmd`)** | `.mcp.json` & `commandcode.json` | `node bin/vf.js config install command-code` |
 | **Meta Muse (`muse`)** | `.muse/mcp_config.json` & `~/.config/muse/settings.json` | `node bin/vf.js config install muse` |
 | **OpenAI Codex (`codex`)** | `.codex/config.toml` & `~/.codex/config.toml` | `node bin/vf.js config install codex` |
+| **Cursor IDE** | `.cursor/mcp.json` & `.cursorrules` | `node bin/vf.js config install cursor` |
+| **Windsurf (Codeium)** | `.windsurf/mcp_config.json` & `.windsurfrules` | `node bin/vf.js config install windsurf` |
+| **GitHub Copilot / VS Code** | `.vscode/mcp.json` & `.github/copilot-instructions.md` | `node bin/vf.js config install copilot` |
+| **Kiro IDE** | `.kiro/mcp.json` & `kiro.json` | `node bin/vf.js config install kiro` |
 
 ### Automated Configuration & Health Check
 ```bash
-# Auto-configure all supported AI harnesses at once:
+# Auto-configure all 9 supported AI harnesses at once:
 node bin/vf.js config install all
 
 # Verify SQLite DB, AGENTS.md, and all MCP client configs:
 node bin/vf.js status
 ```
 
-### JSON Configuration (Antigravity, Claude Code, Command Code, Muse)
+### JSON Configuration (Antigravity, Claude Code, Command Code, Muse, Cursor, Windsurf, VS Code, Kiro)
 ```json
 {
   "mcpServers": {
@@ -178,6 +182,96 @@ args = ["/absolute/path/to/VectorForce/bin/vf.js", "mcp"]
 [mcp_servers.vectorforce.env]
 VF_HARNESS = "codex"
 ```
+
+---
+
+## How to Configure & Update MCP for Any Other AI Coding Harness
+
+If your AI assistant or IDE is not in the auto-configured list above, you can connect it to VectorForce in seconds using standard MCP configuration:
+
+### 1. Cline & Roo Code (VS Code Extension)
+Open VS Code Settings or click the **MCP** icon in the Cline panel:
+- Open `cline_mcp_settings.json` (or `roo-cline_mcp_settings.json`) located at:
+  - **macOS:** `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+  - **Linux:** `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+  - **Windows:** `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+- Add the VectorForce entry:
+```json
+{
+  "mcpServers": {
+    "vectorforce": {
+      "command": "npx",
+      "args": ["-y", "vectorforce", "mcp"],
+      "disabled": false,
+      "autoApprove": [
+        "list_tasks",
+        "check_workspace_drift",
+        "get_resume_briefing",
+        "save_checkpoint",
+        "reason_about_task"
+      ]
+    }
+  }
+}
+```
+
+### 2. Zed Editor
+Zed natively supports MCP context servers. Open your Zed configuration (`~/.config/zed/settings.json` or `cmd-,`):
+```json
+{
+  "context_servers": {
+    "vectorforce": {
+      "command": {
+        "path": "npx",
+        "args": ["-y", "vectorforce", "mcp"]
+      }
+    }
+  }
+}
+```
+
+### 3. JetBrains IDEs (IntelliJ IDEA, WebStorm, PyCharm, RustRover)
+For JetBrains IDEs supporting MCP or AI Assistant:
+1. Open **Settings / Preferences** (`Ctrl+Alt+S` or `Cmd+,`).
+2. Search for **Model Context Protocol** or **AI Assistant → Context Providers**.
+3. Click **Add Stdio Server**:
+   - **Name:** `vectorforce`
+   - **Command:** `node` (or `npx`)
+   - **Arguments:** `/path/to/VectorForce/bin/vf.js mcp` (or `-y vectorforce mcp`)
+   - **Environment Variables:** `VF_HARNESS=jetbrains`
+
+### 4. Sourcegraph Cody
+In Sourcegraph Cody settings (`cody.experimental.mcp.servers` in VS Code or JetBrains):
+```json
+{
+  "cody.experimental.mcp.servers": {
+    "vectorforce": {
+      "command": "node",
+      "args": ["/path/to/VectorForce/bin/vf.js", "mcp"]
+    }
+  }
+}
+```
+
+### 5. Aider (`aider-chat`)
+Aider integrates directly with Git and can ingest VectorForce's immutable architectural briefings:
+```bash
+# Pipe VectorForce briefing directly to Aider on session start:
+node bin/vf.js resume --task <task_id> --dest cli --raw | aider
+
+# Or generate project conventions before running aider:
+node bin/vf.js resume --task <task_id> --dest cli --raw > CONVENTIONS.md
+aider
+```
+
+### 6. Generic MCP Client (Any Tool Speaking JSON-RPC 2.0 over Stdio)
+For any agent running locally, pass:
+- **Executable:** `node`
+- **Arguments:** `["/path/to/bin/vf.js", "mcp"]`
+- **Working Directory:** Path to your project workspace
+- **Environment:** `VF_WORKSPACE=/path/to/project` (optional if working directory matches)
+
+Whenever you update VectorForce (`npm update -g vectorforce`), simply restart your AI agent or IDE window to immediately use the latest MCP tools.
 
 ### Available MCP Tools
 | Tool | Purpose |

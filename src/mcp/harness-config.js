@@ -543,4 +543,478 @@ export class HarnessConfig {
 
     return removed;
   }
+
+  // ==========================================
+  // Cursor IDE Integration
+  // ==========================================
+
+  /**
+   * Generate configuration object for Cursor (.cursor/mcp.json).
+   */
+  static getCursorServerEntry() {
+    return {
+      command: 'node',
+      args: [HarnessConfig.getBinPath(), 'mcp'],
+      env: {
+        VF_HARNESS: 'cursor'
+      }
+    };
+  }
+
+  /**
+   * Preview changes to Cursor configuration.
+   * @param {string} workspacePath
+   */
+  static previewCursor(workspacePath) {
+    const dir = join(workspacePath, '.cursor');
+    const filePath = join(dir, 'mcp.json');
+    let current = null;
+    if (existsSync(filePath)) {
+      try {
+        current = JSON.parse(readFileSync(filePath, 'utf8'));
+      } catch {
+        current = {};
+      }
+    }
+    const mergedContent = {
+      ...(current || {}),
+      mcpServers: {
+        ...(current?.mcpServers || {}),
+        vectorforce: HarnessConfig.getCursorServerEntry()
+      }
+    };
+    return {
+      filePath,
+      exists: existsSync(filePath),
+      currentContent: current,
+      mergedContent
+    };
+  }
+
+  /**
+   * Install Cursor MCP configuration and rules reversibly.
+   * @param {string} workspacePath
+   * @returns {string} filePath
+   */
+  static installCursor(workspacePath) {
+    const { filePath, mergedContent } = HarnessConfig.previewCursor(workspacePath);
+    const dir = join(workspacePath, '.cursor');
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true, mode: 0o755 });
+    }
+    writeFileSync(filePath, JSON.stringify(mergedContent, null, 2) + '\n', 'utf8');
+
+    // Create .cursorrules if missing
+    const cursorRulesPath = join(workspacePath, '.cursorrules');
+    if (!existsSync(cursorRulesPath)) {
+      writeFileSync(
+        cursorRulesPath,
+        `# VectorForce Agent Protocol (Cursor)\n\nThis workspace uses VectorForce for architectural continuity and drift verification.\n- Check active tasks & drift: Use MCP tools 'list_tasks' & 'check_workspace_drift'\n- Retrieve briefing: Use MCP tool 'get_resume_briefing'\n- Save checkpoint: Use MCP tool 'save_checkpoint'\n`,
+        'utf8'
+      );
+    }
+
+    if (!isTempWorkspace(workspacePath)) {
+      try {
+        const globalCursorDir = join(homedir(), '.cursor');
+        if (existsSync(globalCursorDir)) {
+          const globalMcpPath = join(globalCursorDir, 'mcp.json');
+          let globalConfig = {};
+          if (existsSync(globalMcpPath)) {
+            try {
+              globalConfig = JSON.parse(readFileSync(globalMcpPath, 'utf8'));
+            } catch {
+              globalConfig = {};
+            }
+          }
+          globalConfig.mcpServers = {
+            ...(globalConfig.mcpServers || {}),
+            vectorforce: {
+              command: 'node',
+              args: [HarnessConfig.getBinPath(), 'mcp', '--workspace', workspacePath],
+              env: {
+                VF_WORKSPACE: workspacePath,
+                VF_HARNESS: 'cursor'
+              }
+            }
+          };
+          writeFileSync(globalMcpPath, JSON.stringify(globalConfig, null, 2) + '\n', 'utf8');
+        }
+      } catch {}
+    }
+
+    return filePath;
+  }
+
+  /**
+   * Reversibly uninstall VectorForce from Cursor configuration.
+   * @param {string} workspacePath
+   * @returns {boolean} whether removed
+   */
+  static uninstallCursor(workspacePath) {
+    const filePath = join(workspacePath, '.cursor', 'mcp.json');
+    let removed = false;
+    if (existsSync(filePath)) {
+      try {
+        const config = JSON.parse(readFileSync(filePath, 'utf8'));
+        if (config?.mcpServers?.vectorforce) {
+          delete config.mcpServers.vectorforce;
+          writeFileSync(filePath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+          removed = true;
+        }
+      } catch {}
+    }
+    return removed;
+  }
+
+  // ==========================================
+  // Windsurf Cascade Integration
+  // ==========================================
+
+  /**
+   * Generate configuration object for Windsurf (.windsurf/mcp_config.json).
+   */
+  static getWindsurfServerEntry() {
+    return {
+      command: 'node',
+      args: [HarnessConfig.getBinPath(), 'mcp'],
+      env: {
+        VF_HARNESS: 'windsurf'
+      }
+    };
+  }
+
+  /**
+   * Preview changes to Windsurf configuration.
+   * @param {string} workspacePath
+   */
+  static previewWindsurf(workspacePath) {
+    const dir = join(workspacePath, '.windsurf');
+    const filePath = join(dir, 'mcp_config.json');
+    let current = null;
+    if (existsSync(filePath)) {
+      try {
+        current = JSON.parse(readFileSync(filePath, 'utf8'));
+      } catch {
+        current = {};
+      }
+    }
+    const mergedContent = {
+      ...(current || {}),
+      mcpServers: {
+        ...(current?.mcpServers || {}),
+        vectorforce: HarnessConfig.getWindsurfServerEntry()
+      }
+    };
+    return {
+      filePath,
+      exists: existsSync(filePath),
+      currentContent: current,
+      mergedContent
+    };
+  }
+
+  /**
+   * Install Windsurf MCP configuration and rules reversibly.
+   * @param {string} workspacePath
+   * @returns {string} filePath
+   */
+  static installWindsurf(workspacePath) {
+    const { filePath, mergedContent } = HarnessConfig.previewWindsurf(workspacePath);
+    const dir = join(workspacePath, '.windsurf');
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true, mode: 0o755 });
+    }
+    writeFileSync(filePath, JSON.stringify(mergedContent, null, 2) + '\n', 'utf8');
+
+    // Create .windsurfrules if missing
+    const windsurfRulesPath = join(workspacePath, '.windsurfrules');
+    if (!existsSync(windsurfRulesPath)) {
+      writeFileSync(
+        windsurfRulesPath,
+        `# VectorForce Agent Protocol (Windsurf Cascade)\n\nThis workspace uses VectorForce for architectural continuity and drift verification.\n- Check tasks & drift: Call MCP tools 'list_tasks' and 'check_workspace_drift'\n- Resume briefing: Call MCP tool 'get_resume_briefing'\n- Save checkpoint: Call MCP tool 'save_checkpoint'\n`,
+        'utf8'
+      );
+    }
+
+    if (!isTempWorkspace(workspacePath)) {
+      try {
+        const globalWindsurfDir = join(homedir(), '.codeium', 'windsurf');
+        if (existsSync(globalWindsurfDir)) {
+          const globalMcpPath = join(globalWindsurfDir, 'mcp_config.json');
+          let globalConfig = {};
+          if (existsSync(globalMcpPath)) {
+            try {
+              globalConfig = JSON.parse(readFileSync(globalMcpPath, 'utf8'));
+            } catch {
+              globalConfig = {};
+            }
+          }
+          globalConfig.mcpServers = {
+            ...(globalConfig.mcpServers || {}),
+            vectorforce: {
+              command: 'node',
+              args: [HarnessConfig.getBinPath(), 'mcp', '--workspace', workspacePath],
+              env: {
+                VF_WORKSPACE: workspacePath,
+                VF_HARNESS: 'windsurf'
+              }
+            }
+          };
+          writeFileSync(globalMcpPath, JSON.stringify(globalConfig, null, 2) + '\n', 'utf8');
+        }
+      } catch {}
+    }
+
+    return filePath;
+  }
+
+  /**
+   * Reversibly uninstall VectorForce from Windsurf configuration.
+   * @param {string} workspacePath
+   * @returns {boolean} whether removed
+   */
+  static uninstallWindsurf(workspacePath) {
+    const filePath = join(workspacePath, '.windsurf', 'mcp_config.json');
+    let removed = false;
+    if (existsSync(filePath)) {
+      try {
+        const config = JSON.parse(readFileSync(filePath, 'utf8'));
+        if (config?.mcpServers?.vectorforce) {
+          delete config.mcpServers.vectorforce;
+          writeFileSync(filePath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+          removed = true;
+        }
+      } catch {}
+    }
+    return removed;
+  }
+
+  // ==========================================
+  // GitHub Copilot & VS Code Integration
+  // ==========================================
+
+  /**
+   * Generate configuration object for VS Code / GitHub Copilot (.vscode/mcp.json).
+   */
+  static getCopilotServerEntry() {
+    return {
+      command: 'node',
+      args: [HarnessConfig.getBinPath(), 'mcp'],
+      env: {
+        VF_HARNESS: 'copilot'
+      }
+    };
+  }
+
+  /**
+   * Preview changes to Copilot / VS Code configuration.
+   * @param {string} workspacePath
+   */
+  static previewCopilot(workspacePath) {
+    const dir = join(workspacePath, '.vscode');
+    const filePath = join(dir, 'mcp.json');
+    let current = null;
+    if (existsSync(filePath)) {
+      try {
+        current = JSON.parse(readFileSync(filePath, 'utf8'));
+      } catch {
+        current = {};
+      }
+    }
+    const mergedContent = {
+      ...(current || {}),
+      mcpServers: {
+        ...(current?.mcpServers || {}),
+        vectorforce: HarnessConfig.getCopilotServerEntry()
+      }
+    };
+    return {
+      filePath,
+      exists: existsSync(filePath),
+      currentContent: current,
+      mergedContent
+    };
+  }
+
+  /**
+   * Install GitHub Copilot workspace instructions & VS Code MCP configuration.
+   * @param {string} workspacePath
+   * @returns {string} filePath
+   */
+  static installCopilot(workspacePath) {
+    const { filePath, mergedContent } = HarnessConfig.previewCopilot(workspacePath);
+    const vscodeDir = join(workspacePath, '.vscode');
+    if (!existsSync(vscodeDir)) {
+      mkdirSync(vscodeDir, { recursive: true, mode: 0o755 });
+    }
+    writeFileSync(filePath, JSON.stringify(mergedContent, null, 2) + '\n', 'utf8');
+
+    // Create .github/copilot-instructions.md if missing
+    const githubDir = join(workspacePath, '.github');
+    if (!existsSync(githubDir)) {
+      mkdirSync(githubDir, { recursive: true, mode: 0o755 });
+    }
+    const copilotMdPath = join(githubDir, 'copilot-instructions.md');
+    if (!existsSync(copilotMdPath)) {
+      writeFileSync(
+        copilotMdPath,
+        `# VectorForce Context Protocol (GitHub Copilot)\n\nThis workspace uses VectorForce for architectural continuity and drift protection.\n- Architectural decisions (ADRs) and invariant constraints are tracked in VectorForce.\n- Check tasks and drift via VectorForce MCP or \`node bin/vf.js drift\`.\n- Always capture progress with \`node bin/vf.js checkpoint\`.\n`,
+        'utf8'
+      );
+    }
+
+    return filePath;
+  }
+
+  /**
+   * Reversibly uninstall VectorForce from Copilot / VS Code configuration.
+   * @param {string} workspacePath
+   * @returns {boolean} whether removed
+   */
+  static uninstallCopilot(workspacePath) {
+    const filePath = join(workspacePath, '.vscode', 'mcp.json');
+    let removed = false;
+    if (existsSync(filePath)) {
+      try {
+        const config = JSON.parse(readFileSync(filePath, 'utf8'));
+        if (config?.mcpServers?.vectorforce) {
+          delete config.mcpServers.vectorforce;
+          writeFileSync(filePath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+          removed = true;
+        }
+      } catch {}
+    }
+    return removed;
+  }
+
+  // ==========================================
+  // Kiro IDE Integration
+  // ==========================================
+
+  /**
+   * Generate configuration object for Kiro IDE (.kiro/mcp.json).
+   */
+  static getKiroServerEntry() {
+    return {
+      command: 'node',
+      args: [HarnessConfig.getBinPath(), 'mcp'],
+      env: {
+        VF_HARNESS: 'kiro'
+      }
+    };
+  }
+
+  /**
+   * Preview changes to Kiro IDE configuration.
+   * @param {string} workspacePath
+   */
+  static previewKiro(workspacePath) {
+    const dir = join(workspacePath, '.kiro');
+    const filePath = join(dir, 'mcp.json');
+    const kiroJsonPath = join(workspacePath, 'kiro.json');
+
+    let current = null;
+    if (existsSync(filePath)) {
+      try {
+        current = JSON.parse(readFileSync(filePath, 'utf8'));
+      } catch {
+        current = {};
+      }
+    }
+    const mergedContent = {
+      ...(current || {}),
+      mcpServers: {
+        ...(current?.mcpServers || {}),
+        vectorforce: HarnessConfig.getKiroServerEntry()
+      }
+    };
+
+    let currentKiroJson = null;
+    if (existsSync(kiroJsonPath)) {
+      try {
+        currentKiroJson = JSON.parse(readFileSync(kiroJsonPath, 'utf8'));
+      } catch {
+        currentKiroJson = {};
+      }
+    }
+    const mergedKiroJson = {
+      ...(currentKiroJson || {}),
+      mcpServers: {
+        ...(currentKiroJson?.mcpServers || {}),
+        vectorforce: HarnessConfig.getKiroServerEntry()
+      }
+    };
+
+    return {
+      filePath,
+      kiroJsonPath,
+      exists: existsSync(filePath) || existsSync(kiroJsonPath),
+      currentContent: current,
+      mergedContent,
+      mergedKiroJson
+    };
+  }
+
+  /**
+   * Install Kiro IDE MCP configuration and rules reversibly.
+   * @param {string} workspacePath
+   * @returns {string} filePath
+   */
+  static installKiro(workspacePath) {
+    const { filePath, kiroJsonPath, mergedContent, mergedKiroJson } = HarnessConfig.previewKiro(workspacePath);
+    const dir = join(workspacePath, '.kiro');
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true, mode: 0o755 });
+    }
+    writeFileSync(filePath, JSON.stringify(mergedContent, null, 2) + '\n', 'utf8');
+    writeFileSync(kiroJsonPath, JSON.stringify(mergedKiroJson, null, 2) + '\n', 'utf8');
+
+    // Create .kiro/rules.md if missing
+    const rulesPath = join(dir, 'rules.md');
+    if (!existsSync(rulesPath)) {
+      writeFileSync(
+        rulesPath,
+        `# VectorForce Agent Steering (Kiro IDE)\n\nThis workspace uses VectorForce for architectural continuity and drift prevention.\n- Use VectorForce MCP tools: 'list_tasks', 'check_workspace_drift', 'get_resume_briefing', 'save_checkpoint'.\n- Strictly adhere to invariant constraints and architectural decisions.\n`,
+        'utf8'
+      );
+    }
+
+    return filePath;
+  }
+
+  /**
+   * Reversibly uninstall VectorForce from Kiro IDE configuration.
+   * @param {string} workspacePath
+   * @returns {boolean} whether removed
+   */
+  static uninstallKiro(workspacePath) {
+    const filePath = join(workspacePath, '.kiro', 'mcp.json');
+    const kiroJsonPath = join(workspacePath, 'kiro.json');
+    let removed = false;
+
+    if (existsSync(filePath)) {
+      try {
+        const config = JSON.parse(readFileSync(filePath, 'utf8'));
+        if (config?.mcpServers?.vectorforce) {
+          delete config.mcpServers.vectorforce;
+          writeFileSync(filePath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+          removed = true;
+        }
+      } catch {}
+    }
+
+    if (existsSync(kiroJsonPath)) {
+      try {
+        const config = JSON.parse(readFileSync(kiroJsonPath, 'utf8'));
+        if (config?.mcpServers?.vectorforce) {
+          delete config.mcpServers.vectorforce;
+          writeFileSync(kiroJsonPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+          removed = true;
+        }
+      } catch {}
+    }
+
+    return removed;
+  }
 }

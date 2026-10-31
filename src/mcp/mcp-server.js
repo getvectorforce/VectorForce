@@ -44,7 +44,7 @@ export const MCP_TOOLS = [
         task_id: { type: 'string' },
         checkpoint_id: { type: 'string', description: 'Optional specific checkpoint ID. Defaults to latest head.' },
         max_tokens: { type: 'integer', default: 4000, maximum: 8000 },
-        destination_harness: { type: 'string', enum: ['antigravity', 'command-code', 'muse', 'muse-code', 'pi', 'codex', 'cli'] }
+        destination_harness: { type: 'string', enum: ['antigravity', 'command-code', 'muse', 'muse-code', 'pi', 'codex', 'cli', 'cursor', 'windsurf', 'github-copilot', 'copilot', 'kiro', 'kiro-ide'] }
       }
     }
   },
@@ -91,7 +91,7 @@ export const MCP_TOOLS = [
         task_id: { type: 'string', description: 'Kebab-case task slug' },
         recipient: { type: 'string', description: 'Target developer or audience identity' },
         checkpoint_id: { type: 'string', description: 'Optional specific checkpoint ID to export' },
-        destination_harness: { type: 'string', enum: ['antigravity', 'command-code', 'muse', 'muse-code', 'pi', 'codex', 'cli', 'any'], default: 'any' },
+        destination_harness: { type: 'string', enum: ['antigravity', 'command-code', 'muse', 'muse-code', 'pi', 'codex', 'cli', 'cursor', 'windsurf', 'github-copilot', 'copilot', 'kiro', 'kiro-ide', 'any'], default: 'any' },
         preview: { type: 'boolean', default: false, description: 'Dry run preview without writing file' },
         out_path: { type: 'string', description: 'Optional custom bundle file destination' }
       }
@@ -117,7 +117,7 @@ export const MCP_TOOLS = [
       properties: {
         days: { type: 'integer', default: 7, description: 'Number of past days to include in the recap (defaults to 7)' },
         task_id: { type: 'string', description: 'Optional specific task ID to filter by' },
-        destination_harness: { type: 'string', enum: ['antigravity', 'command-code', 'muse', 'muse-code', 'pi', 'codex', 'cli'] }
+        destination_harness: { type: 'string', enum: ['antigravity', 'command-code', 'muse', 'muse-code', 'pi', 'codex', 'cli', 'cursor', 'windsurf', 'github-copilot', 'copilot', 'kiro', 'kiro-ide'] }
       }
     }
   },
@@ -130,7 +130,7 @@ export const MCP_TOOLS = [
       properties: {
         task_id: { type: 'string', description: 'Kebab-case task slug' },
         checkpoint_id: { type: 'string', description: 'Optional specific checkpoint ID. Defaults to latest head.' },
-        destination_harness: { type: 'string', enum: ['antigravity', 'command-code', 'muse', 'muse-code', 'pi', 'codex', 'cli'] },
+        destination_harness: { type: 'string', enum: ['antigravity', 'command-code', 'muse', 'muse-code', 'pi', 'codex', 'cli', 'cursor', 'windsurf', 'github-copilot', 'copilot', 'kiro', 'kiro-ide'] },
         model: { type: 'string', description: 'Optional model override (e.g. a Meta Llama or Muse model id)' },
         focus: { type: 'string', description: 'Optional question or focus for the reasoning pass' },
         include_code: { type: 'boolean', default: true, description: 'Ground reasoning in the live codebase index' }

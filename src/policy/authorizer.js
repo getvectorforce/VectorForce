@@ -5,7 +5,21 @@ import { ErrorCode, VectorForceError } from '../core/errors.js';
 export const MAX_FILE_BYTES = 8192; // 8 KiB per file
 export const MAX_TOTAL_DOCUMENT_BYTES = 65536; // 64 KiB total
 export const ALLOWED_EXTENSIONS = ['.md', '.txt'];
-export const APPROVED_DESTINATIONS = ['antigravity', 'command-code', 'muse', 'muse-code', 'pi', 'codex', 'cli'];
+export const APPROVED_DESTINATIONS = [
+  'antigravity',
+  'command-code',
+  'muse',
+  'muse-code',
+  'pi',
+  'codex',
+  'cli',
+  'cursor',
+  'windsurf',
+  'github-copilot',
+  'copilot',
+  'kiro',
+  'kiro-ide'
+];
 
 export class Authorizer {
   /**

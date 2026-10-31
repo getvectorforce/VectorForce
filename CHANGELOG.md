@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.2] - 2026-11-01
+
+### Added
+- **First-Class Support for 4 Additional AI Harnesses**:
+  - **Cursor IDE**: Added automated configuration for `.cursor/mcp.json` and `.cursorrules` in `HarnessConfig.installCursor`.
+  - **Windsurf (Codeium Cascade)**: Added automated configuration for `.windsurf/mcp_config.json` and `.windsurfrules` in `HarnessConfig.installWindsurf`.
+  - **GitHub Copilot / VS Code**: Added automated workspace configuration for `.vscode/mcp.json` and `.github/copilot-instructions.md` in `HarnessConfig.installCopilot`.
+  - **Kiro IDE**: Added automated configuration for `.kiro/mcp.json`, `kiro.json`, and `.kiro/rules.md` in `HarnessConfig.installKiro`.
+- **Harness Policy & Tool Schema Expansion**:
+  - Updated `APPROVED_DESTINATIONS` in `Authorizer` to approve `cursor`, `windsurf`, `github-copilot`, `copilot`, `kiro`, and `kiro-ide`.
+  - Updated MCP tool schemas for `get_resume_briefing`, `export_handoff`, `get_timeline`, and `reason_about_task` to accept all newly supported harnesses.
+- **Universal MCP Configuration Guide in Documentation**:
+  - Added dedicated installation instructions to `README.md` for Cline / Roo Code, Zed Editor, JetBrains IDEs (IntelliJ, WebStorm, PyCharm), Sourcegraph Cody, Aider, and generic stdio MCP clients.
+- **Comprehensive Unit & Security Test Coverage**:
+  - Added automated reversible install/uninstall tests for Cursor, Windsurf, GitHub Copilot, and Kiro IDE (test suite expanded to 79 tests).
+
+### Changed
+- `vf init`, `vf config install all`, `vf config doctor`, and `vf status` now inspect and provision all 9 AI coding harnesses.
+- Pruned `package.json` package `files` whitelist to strictly include runtime artifacts (`bin/`, `src/`, `studio/dist/`, `CHANGELOG.md`, `LICENSE`, `README.md`).
+
+---
+
 ## [0.2.0] - 2026-10-31
 
 ### Added

@@ -114,6 +114,12 @@ test('T13 Policy: Destination harness authorization', () => {
   assert.strictEqual(Authorizer.authorizeDestination('pi'), true);
   assert.strictEqual(Authorizer.authorizeDestination('codex'), true);
   assert.strictEqual(Authorizer.authorizeDestination('cli'), true);
+  assert.strictEqual(Authorizer.authorizeDestination('cursor'), true);
+  assert.strictEqual(Authorizer.authorizeDestination('windsurf'), true);
+  assert.strictEqual(Authorizer.authorizeDestination('github-copilot'), true);
+  assert.strictEqual(Authorizer.authorizeDestination('copilot'), true);
+  assert.strictEqual(Authorizer.authorizeDestination('kiro'), true);
+  assert.strictEqual(Authorizer.authorizeDestination('kiro-ide'), true);
 
   assert.throws(() => {
     Authorizer.authorizeDestination('untrusted-remote-agent');

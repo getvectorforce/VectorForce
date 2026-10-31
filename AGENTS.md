@@ -1,6 +1,6 @@
 # VectorForce Workspace Architecture & Agent Continuity Guide (`AGENTS.md`)
 
-This repository is the core workspace for **VectorForce** — a local-first, zero-dependency, privacy-preserving engineering context platform ("Git for AI Context") across **Google Antigravity**, **Meta Muse**, **Claude Code**, **Command Code**, and **OpenAI Codex**.
+This repository is the core workspace for **VectorForce** — a local-first, zero-dependency engineering context platform ("Git for AI Context") across **Google Antigravity**, **Meta Muse**, **Claude Code**, **Command Code**, **OpenAI Codex**, **Cursor**, **Windsurf**, **GitHub Copilot**, and **Kiro IDE**.
 
 ---
 
@@ -12,8 +12,8 @@ This repository is the core workspace for **VectorForce** — a local-first, zer
 2. **Check for workspace or document drift:**
    - MCP: `check_workspace_drift({ task_id: "<task_id>" })` | CLI: `node bin/vf.js drift --task <task_id>`
 3. **Retrieve the authorized briefing:**
-   - MCP: `get_resume_briefing({ task_id: "<task_id>", destination_harness: "antigravity" })` (`"antigravity" | "muse-code" | "command-code" | "codex"`)
-   - CLI: `node bin/vf.js resume --task <task_id> --dest antigravity`
+   - MCP: `get_resume_briefing({ task_id: "<task_id>", destination_harness: "<harness>" })`
+   - CLI: `node bin/vf.js resume --task <task_id> --dest <harness>`
 4. **Reason over the context (AI memory):**
    - MCP: `reason_about_task({ task_id: "<task_id>" })` | CLI: `node bin/vf.js reason --task <task_id>`
 5. **Adhere to Invariant Constraints:** Respect all rules under `# Invariant Constraints` in the briefing.
@@ -66,21 +66,25 @@ VectorForce/
 │   │   ├── reasoning-service.js   # AI reasoning synthesis over checkpoints + code index + drift
 │   │   └── handoff-service.js     # HMAC-SHA256 signed handoff export/import + lineage verification
 │   ├── mcp/
-│   │   ├── mcp-server.js          # JSON-RPC 2.0 stdio MCP server exposing 9 tools + 3 resources
-│   │   └── harness-config.js      # Auto-generator for Antigravity, Claude, Command Code, Muse, Codex configs
-│   └── studio/server.js           # Local HTTP server (127.0.0.1:3210) + REST API for VectorForce Studio
-├── studio/                        # React + Vite + Tailwind + XYFlow frontend for VectorForce Studio
-├── samples/                       # Runnable sample architectures, multi-agent workflows & integrations
-├── scripts/practical-test-env.js  # 7-stage cross-OS practical E2E simulation (Git + CLI + MCP + Handoff)
-├── test/                          # 75 automated unit, security, MCP, and cross-harness tests
-└── wiki/                          # Local-only ADRs (001-014) and phase planning (gitignored)
+│   │   ├── mcp-server.js          # JSON-RPC 2.0 stdio MCP server (9 tools, 3 resources)
+│   │   └── harness-config.js      # Harness config generator (Antigravity, Cursor, Windsurf, Copilot, Kiro, Muse, Codex)
+│   └── studio/server.js           # Studio HTTP server (127.0.0.1:3210) + REST API
+├── studio/                        # React + Vite + Tailwind + XYFlow frontend
+├── samples/                       # Multi-agent workflows & integration samples
+├── scripts/practical-test-env.js  # 7-stage practical E2E test
+├── test/                          # 79 automated unit, security, and MCP tests
+└── wiki/                          # Local-only ADRs and planning (gitignored)
 ```
 
 ### Generated Harness Configs in Workspace Root (`vf init`):
-- `.mcp.json`, `.commandcode/mcp.json`, `commandcode.json` — Claude Code & Command Code
-- `.agents/mcp_config.json`, `~/.gemini/antigravity/mcp_config.json` — Google Antigravity
+- `.mcp.json`, `commandcode.json` — Claude Code & Command Code
+- `.agents/mcp_config.json` — Google Antigravity
 - `.muse/mcp_config.json`, `musecode.json` — Meta Muse
 - `.codex/config.toml`, `codex.json` — OpenAI Codex CLI
+- `.cursor/mcp.json`, `.cursorrules` — Cursor IDE
+- `.windsurf/mcp_config.json`, `.windsurfrules` — Windsurf Cascade
+- `.vscode/mcp.json`, `.github/copilot-instructions.md` — GitHub Copilot
+- `.kiro/mcp.json`, `.kiro/rules.md` — Kiro IDE
 
 ---
 
@@ -112,4 +116,4 @@ VectorForce/
 1. **Adding Samples (`samples/`)**: Place runnable workflows, reference architectures, and multi-agent demos inside `samples/` using `src/index.js` or CLI/MCP bridges.
 2. **Adding/Upgrading MCP Tools**: Add business logic in `src/operations/*`, persistence in `src/storage/sqlite-store.js`, MCP registration in `src/mcp/mcp-server.js`, SDK export in `src/index.js`, and CLI command in `bin/vf.js`.
 3. **Upgrading Studio UI**: Add REST routes in `src/studio/server.js` and React views in `studio/src/components/`, then build via `npm --prefix studio run build`.
-4. **Verification Gate**: Always run `npm test` (75 unit/security tests) and `npm run test:practical` (7-stage E2E test) before committing.
+4. **Verification Gate**: Always run `npm test` and `npm run test:practical` before committing.

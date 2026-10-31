@@ -334,11 +334,15 @@ async function main() {
         HarnessConfig.installCommandCode(cwd);
         HarnessConfig.installMuseCode(cwd);
         HarnessConfig.installCodex(cwd);
+        HarnessConfig.installCursor(cwd);
+        HarnessConfig.installWindsurf(cwd);
+        HarnessConfig.installCopilot(cwd);
+        HarnessConfig.installKiro(cwd);
         const agentsMdPath = join(cwd, 'AGENTS.md');
         if (!existsSync(agentsMdPath)) {
           writeFileSync(
             agentsMdPath,
-            `# Agent Continuity Protocol — ${project.name}\n\nThis repository uses **VectorForce** ("Git for AI Context") across Google Antigravity, Meta Muse, Claude Code, Command Code, and OpenAI Codex.\n\n## Workflow\n1. **Start/Resume Task**: Run \`vf tasks active\`, \`vf drift --task <id>\`, and \`vf resume --task <id> --dest <harness>\` (or MCP tools \`list_tasks\`, \`check_workspace_drift\`, \`get_resume_briefing\`, \`reason_about_task\`).\n2. **Save Checkpoint Before Switching IDE**: Run \`vf checkpoint --task <id> --summary "<summary>" --goal "<goal>" --constraint "<constraint>" --decision "<ID>:<Title>:<Rationale>" --next "<next>" --doc "AGENTS.md"\` (or MCP tool \`save_checkpoint\`).\n`,
+            `# Agent Continuity Protocol — ${project.name}\n\nThis repository uses **VectorForce** ("Git for AI Context") across Google Antigravity, Meta Muse, Claude Code, Command Code, OpenAI Codex, Cursor, Windsurf, GitHub Copilot, and Kiro IDE.\n\n## Workflow\n1. **Start/Resume Task**: Run \`vf tasks active\`, \`vf drift --task <id>\`, and \`vf resume --task <id> --dest <harness>\` (or MCP tools \`list_tasks\`, \`check_workspace_drift\`, \`get_resume_briefing\`, \`reason_about_task\`).\n2. **Save Checkpoint Before Switching IDE**: Run \`vf checkpoint --task <id> --summary "<summary>" --goal "<goal>" --constraint "<constraint>" --decision "<ID>:<Title>:<Rationale>" --next "<next>" --doc "AGENTS.md"\` (or MCP tool \`save_checkpoint\`).\n`,
             'utf8'
           );
         }
@@ -582,6 +586,22 @@ async function main() {
             const p = HarnessConfig.installCodex(cwd);
             installed.push(`Codex -> ${p} (+ ~/.codex/config.toml)`);
           }
+          if (target === 'cursor' || target === 'all') {
+            const p = HarnessConfig.installCursor(cwd);
+            installed.push(`Cursor -> ${p} (+ .cursorrules)`);
+          }
+          if (target === 'windsurf' || target === 'all') {
+            const p = HarnessConfig.installWindsurf(cwd);
+            installed.push(`Windsurf -> ${p} (+ .windsurfrules)`);
+          }
+          if (target === 'copilot' || target === 'github-copilot' || target === 'vscode' || target === 'all') {
+            const p = HarnessConfig.installCopilot(cwd);
+            installed.push(`GitHub Copilot / VS Code -> ${p} (+ .github/copilot-instructions.md)`);
+          }
+          if (target === 'kiro' || target === 'kiro-ide' || target === 'all') {
+            const p = HarnessConfig.installKiro(cwd);
+            installed.push(`Kiro IDE -> ${p} (+ kiro.json)`);
+          }
           console.log(`\n✔ Configured harness integration(s):\n  - ${installed.join('\n  - ')}`);
           console.log(`\n💡 Next step: Restart or reload your AI agent, then ask in chat:\n   "List active VectorForce tasks and check workspace drift"`);
           break;
@@ -594,7 +614,11 @@ async function main() {
             { name: 'Google Antigravity (.agents/mcp_config.json)', ok: existsSync(join(cwd, '.agents', 'mcp_config.json')), path: join(cwd, '.agents', 'mcp_config.json') },
             { name: 'Claude Code & Command Code (.mcp.json)', ok: existsSync(join(cwd, '.mcp.json')), path: join(cwd, '.mcp.json') },
             { name: 'Meta Muse (.muse/mcp_config.json)', ok: existsSync(join(cwd, '.muse', 'mcp_config.json')), path: join(cwd, '.muse', 'mcp_config.json') },
-            { name: 'OpenAI Codex (.codex/config.toml)', ok: existsSync(join(cwd, '.codex', 'config.toml')), path: join(cwd, '.codex', 'config.toml') }
+            { name: 'OpenAI Codex (.codex/config.toml)', ok: existsSync(join(cwd, '.codex', 'config.toml')), path: join(cwd, '.codex', 'config.toml') },
+            { name: 'Cursor (.cursor/mcp.json)', ok: existsSync(join(cwd, '.cursor', 'mcp.json')), path: join(cwd, '.cursor', 'mcp.json') },
+            { name: 'Windsurf (.windsurf/mcp_config.json)', ok: existsSync(join(cwd, '.windsurf', 'mcp_config.json')), path: join(cwd, '.windsurf', 'mcp_config.json') },
+            { name: 'GitHub Copilot / VS Code (.vscode/mcp.json)', ok: existsSync(join(cwd, '.vscode', 'mcp.json')), path: join(cwd, '.vscode', 'mcp.json') },
+            { name: 'Kiro IDE (.kiro/mcp.json)', ok: existsSync(join(cwd, '.kiro', 'mcp.json')), path: join(cwd, '.kiro', 'mcp.json') }
           ];
           console.log(`\nVectorForce Workspace & MCP Health Check (${cwd}):\n`);
           for (const c of checks) {
@@ -620,6 +644,18 @@ async function main() {
           }
           if (target === 'codex' || target === 'all') {
             if (HarnessConfig.uninstallCodex(cwd)) uninstalled.push('Codex');
+          }
+          if (target === 'cursor' || target === 'all') {
+            if (HarnessConfig.uninstallCursor(cwd)) uninstalled.push('Cursor');
+          }
+          if (target === 'windsurf' || target === 'all') {
+            if (HarnessConfig.uninstallWindsurf(cwd)) uninstalled.push('Windsurf');
+          }
+          if (target === 'copilot' || target === 'github-copilot' || target === 'vscode' || target === 'all') {
+            if (HarnessConfig.uninstallCopilot(cwd)) uninstalled.push('GitHub Copilot / VS Code');
+          }
+          if (target === 'kiro' || target === 'kiro-ide' || target === 'all') {
+            if (HarnessConfig.uninstallKiro(cwd)) uninstalled.push('Kiro IDE');
           }
           console.log(`\n✔ Removed harness integration(s): ${uninstalled.length ? uninstalled.join(', ') : 'none found'}`);
           break;
@@ -1101,7 +1137,11 @@ VectorForce Harness Configuration:
           { name: 'Google Antigravity (.agents/mcp_config.json)', ok: existsSync(join(cwd, '.agents', 'mcp_config.json')) },
           { name: 'Claude Code & Command Code (.mcp.json)', ok: existsSync(join(cwd, '.mcp.json')) },
           { name: 'Meta Muse (.muse/mcp_config.json or musecode.json)', ok: existsSync(join(cwd, '.muse', 'mcp_config.json')) || existsSync(join(cwd, 'musecode.json')) },
-          { name: 'OpenAI Codex (.codex/config.toml)', ok: existsSync(join(cwd, '.codex', 'config.toml')) }
+          { name: 'OpenAI Codex (.codex/config.toml)', ok: existsSync(join(cwd, '.codex', 'config.toml')) },
+          { name: 'Cursor (.cursor/mcp.json)', ok: existsSync(join(cwd, '.cursor', 'mcp.json')) },
+          { name: 'Windsurf (.windsurf/mcp_config.json)', ok: existsSync(join(cwd, '.windsurf', 'mcp_config.json')) },
+          { name: 'GitHub Copilot / VS Code (.vscode/mcp.json)', ok: existsSync(join(cwd, '.vscode', 'mcp.json')) },
+          { name: 'Kiro IDE (.kiro/mcp.json)', ok: existsSync(join(cwd, '.kiro', 'mcp.json')) }
         ];
         console.log(`\nVectorForce Workspace & MCP Status (${cwd}):\n`);
         for (const c of checks) {
@@ -1109,7 +1149,7 @@ VectorForce Harness Configuration:
         }
         console.log(`\n💡 How it works:`);
         console.log(`  1. You do NOT need to run "vf mcp" manually.`);
-        console.log(`  2. Your AI agent (Antigravity, Claude Code, Command Code, Muse, Codex) reads its config file above and automatically spawns "vf mcp" over stdio.`);
+        console.log(`  2. Your AI agent (Antigravity, Claude Code, Command Code, Muse, Codex, Cursor, Windsurf, Copilot, Kiro) reads its config file above and automatically spawns "vf mcp" over stdio.`);
         console.log(`  3. To verify in your AI chat, ask: "List active VectorForce tasks and check workspace drift"\n`);
         break;
       }

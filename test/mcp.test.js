@@ -340,6 +340,115 @@ test('HarnessConfig: Reversible Codex installation and uninstall', () => {
   }
 });
 
+test('HarnessConfig: Reversible Cursor installation and uninstall', () => {
+  const fixture = createTestFixture();
+  try {
+    const preview = HarnessConfig.previewCursor(fixture.workspacePath);
+    assert.ok(preview.filePath.includes('.cursor'));
+    assert.ok(preview.mergedContent.mcpServers.vectorforce);
+
+    // Install
+    const installedPath = HarnessConfig.installCursor(fixture.workspacePath);
+    assert.ok(existsSync(installedPath));
+    assert.ok(existsSync(join(fixture.workspacePath, '.cursorrules')));
+
+    const config = JSON.parse(readFileSync(installedPath, 'utf8'));
+    assert.strictEqual(config.mcpServers.vectorforce.command, 'node');
+    assert.strictEqual(config.mcpServers.vectorforce.env.VF_HARNESS, 'cursor');
+
+    // Uninstall
+    const removed = HarnessConfig.uninstallCursor(fixture.workspacePath);
+    assert.strictEqual(removed, true);
+
+    const post = JSON.parse(readFileSync(installedPath, 'utf8'));
+    assert.strictEqual(post.mcpServers.vectorforce, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test('HarnessConfig: Reversible Windsurf installation and uninstall', () => {
+  const fixture = createTestFixture();
+  try {
+    const preview = HarnessConfig.previewWindsurf(fixture.workspacePath);
+    assert.ok(preview.filePath.includes('.windsurf'));
+    assert.ok(preview.mergedContent.mcpServers.vectorforce);
+
+    // Install
+    const installedPath = HarnessConfig.installWindsurf(fixture.workspacePath);
+    assert.ok(existsSync(installedPath));
+    assert.ok(existsSync(join(fixture.workspacePath, '.windsurfrules')));
+
+    const config = JSON.parse(readFileSync(installedPath, 'utf8'));
+    assert.strictEqual(config.mcpServers.vectorforce.command, 'node');
+    assert.strictEqual(config.mcpServers.vectorforce.env.VF_HARNESS, 'windsurf');
+
+    // Uninstall
+    const removed = HarnessConfig.uninstallWindsurf(fixture.workspacePath);
+    assert.strictEqual(removed, true);
+
+    const post = JSON.parse(readFileSync(installedPath, 'utf8'));
+    assert.strictEqual(post.mcpServers.vectorforce, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test('HarnessConfig: Reversible GitHub Copilot installation and uninstall', () => {
+  const fixture = createTestFixture();
+  try {
+    const preview = HarnessConfig.previewCopilot(fixture.workspacePath);
+    assert.ok(preview.filePath.includes('.vscode'));
+    assert.ok(preview.mergedContent.mcpServers.vectorforce);
+
+    // Install
+    const installedPath = HarnessConfig.installCopilot(fixture.workspacePath);
+    assert.ok(existsSync(installedPath));
+    assert.ok(existsSync(join(fixture.workspacePath, '.github', 'copilot-instructions.md')));
+
+    const config = JSON.parse(readFileSync(installedPath, 'utf8'));
+    assert.strictEqual(config.mcpServers.vectorforce.command, 'node');
+    assert.strictEqual(config.mcpServers.vectorforce.env.VF_HARNESS, 'copilot');
+
+    // Uninstall
+    const removed = HarnessConfig.uninstallCopilot(fixture.workspacePath);
+    assert.strictEqual(removed, true);
+
+    const post = JSON.parse(readFileSync(installedPath, 'utf8'));
+    assert.strictEqual(post.mcpServers.vectorforce, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test('HarnessConfig: Reversible Kiro IDE installation and uninstall', () => {
+  const fixture = createTestFixture();
+  try {
+    const preview = HarnessConfig.previewKiro(fixture.workspacePath);
+    assert.ok(preview.filePath.includes('.kiro'));
+    assert.ok(preview.mergedContent.mcpServers.vectorforce);
+
+    // Install
+    const installedPath = HarnessConfig.installKiro(fixture.workspacePath);
+    assert.ok(existsSync(installedPath));
+    assert.ok(existsSync(preview.kiroJsonPath));
+    assert.ok(existsSync(join(fixture.workspacePath, '.kiro', 'rules.md')));
+
+    const config = JSON.parse(readFileSync(installedPath, 'utf8'));
+    assert.strictEqual(config.mcpServers.vectorforce.command, 'node');
+    assert.strictEqual(config.mcpServers.vectorforce.env.VF_HARNESS, 'kiro');
+
+    // Uninstall
+    const removed = HarnessConfig.uninstallKiro(fixture.workspacePath);
+    assert.strictEqual(removed, true);
+
+    const post = JSON.parse(readFileSync(installedPath, 'utf8'));
+    assert.strictEqual(post.mcpServers.vectorforce, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test('MCP: reason_about_task returns an AI narrative and header', async () => {
   const fixture = createTestFixture();
   try {

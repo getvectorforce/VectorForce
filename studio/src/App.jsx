@@ -12,7 +12,13 @@ import NewCheckpointModal from './components/NewCheckpointModal';
 import { initialProjectData } from './data/mockData';
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState('dashboard');
+  const [currentTab, setCurrentTab] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('tab') || 'dashboard';
+    } catch {
+      return 'dashboard';
+    }
+  });
   const [projectData, setProjectData] = useState(initialProjectData);
   const [isCheckpointModalOpen, setIsCheckpointModalOpen] = useState(false);
   const [aiFocusPrompt, setAiFocusPrompt] = useState('');
@@ -40,19 +46,58 @@ export default function App() {
   useEffect(() => {
     async function loadLiveData() {
       try {
-        const [statusRes, memoryRes] = await Promise.all([
+        const [statusRes, memoryRes, timelineRes] = await Promise.all([
           fetch('/api/status').catch(() => null),
-          fetch('/api/memory').catch(() => null)
+          fetch('/api/memory').catch(() => null),
+          fetch('/api/timeline?days=30').catch(() => null)
         ]);
 
-        if (statusRes && statusRes.ok) {
-          const status = await statusRes.json();
+        const status = statusRes && statusRes.ok ? await statusRes.json() : null;
+        const memory = memoryRes && memoryRes.ok ? await memoryRes.json() : null;
+        const timeline = timelineRes && timelineRes.ok ? await timelineRes.json() : null;
+
+        if (status) {
+          const liveCheckpoints = Array.isArray(timeline?.checkpoints)
+            ? [...timeline.checkpoints].reverse().map((cp) => ({
+                id: cp.checkpoint_id,
+                task_id: cp.task_id,
+                timestamp: cp.timestamp ? new Date(cp.timestamp).toLocaleString() : 'Recent',
+                author: `${cp.author?.name || 'developer'} (${cp.author?.harness || 'cli'})`,
+                summary: cp.summary || cp.claims?.summary || '',
+                commit: cp.evidence?.git?.commit_hash ? cp.evidence.git.commit_hash.slice(0, 7) : 'local',
+                branch: cp.evidence?.git?.branch || 'main',
+                status: 'committed',
+                goals: cp.claims?.goals || [],
+                decisions: (cp.claims?.decisions || []).map((d) => d.id),
+                drift: false
+              }))
+            : null;
+
           setProjectData((prev) => ({
             ...prev,
-            project: { ...prev.project, name: status.project.name, id: status.project.id },
-            ai: status.ai || prev.ai,
-            tasks: status.tasks || prev.tasks,
+            project: {
+              ...prev.project,
+              name: status.project.name,
+              id: status.project.id,
+              canonical_path: status.project.path || prev.project.canonical_path
+            },
+            ai: {
+              ...prev.ai,
+              ...(status.ai || {})
+            },
+            tasks: Array.isArray(status.tasks?.list) ? status.tasks.list : prev.tasks,
             lastCheckpoint: status.lastCheckpoint || prev.lastCheckpoint,
+            checkpoints: liveCheckpoints && liveCheckpoints.length > 0 ? liveCheckpoints : prev.checkpoints,
+            decisions: Array.isArray(memory?.decisions) && memory.decisions.length > 0 ? memory.decisions : prev.decisions,
+            constraints: Array.isArray(memory?.constraints) && memory.constraints.length > 0 ? memory.constraints : prev.constraints,
+            stats: {
+              filesIndexed: memory?.filesIndexed ?? prev.stats.filesIndexed,
+              symbolsIndexed: memory?.symbolsIndexed ?? prev.stats.symbolsIndexed,
+              allowlistedDocs: Array.isArray(memory?.allowedDocuments) ? memory.allowedDocuments.length : prev.stats.allowlistedDocs,
+              checkpointsCount: status.checkpointsCount ?? prev.stats.checkpointsCount,
+              decisionsCount: Array.isArray(memory?.decisions) ? memory.decisions.length : prev.stats.decisionsCount,
+              activeTasks: status.tasks?.active ?? prev.stats.activeTasks
+            },
             health: {
               ...prev.health,
               score: status.health.score,

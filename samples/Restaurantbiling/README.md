@@ -8,6 +8,15 @@ A simplified, zero-database **Restaurant Ordering & Billing Center** built step-
 
 When you run `vf studio` inside this workspace (`http://127.0.0.1:3210`), **VectorForce Studio** visualizes the complete multi-agent topology, code dependency graph, and chronological decision ledger recorded in `.vectorforce/vectorforce.db`.
 
+### Live VectorForce Studio Dashboard (`vf studio`)
+![VectorForce Studio Dashboard — Restaurant Billing Center](assets/vectorforce-studio-dashboard.png)
+
+### Live VectorForce Studio Semantic Project Graph
+![VectorForce Studio Semantic Project Graph](assets/vectorforce-studio-graph.png)
+
+### Live BistroForce POS — Restaurant Ordering & Billing Interface (`npm start`)
+![BistroForce POS Interface](assets/bistroforce-pos-ui.png)
+
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────────────────┐
 │  VECTORFORCE STUDIO · WORKSPACE CONTROL CENTER                      [SQLite WAL: ACTIVE] │
@@ -131,3 +140,4 @@ Restaurantbiling/
 └── test/
     └── billing.test.js              # Unit & live HTTP E2E test suite (4/4 passing)
 ```
+

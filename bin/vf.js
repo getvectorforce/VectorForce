@@ -1020,9 +1020,15 @@ VectorForce Harness Configuration:
         const remoteProjectId = flags.project || remote.remoteProjectId || 'default';
         const project = projectService.getProjectForWorkspace(cwd);
         const tasks = store.listTasks(project.project_id);
-        const machineId = `${hostname()}-local`;
+        const rawHost = hostname();
+        const machineId = flags.machine || (
+          rawHost.toLowerCase().includes('lenovo') ? `Lenovo Laptop (${rawHost})` :
+          rawHost.toLowerCase().includes('macbook') || process.platform === 'darwin' ? `MacBook Pro (${rawHost})` :
+          `${rawHost} (${process.platform})`
+        );
+        const devIdentity = flags.dev || `${process.env.USER || 'developer'}`;
 
-        console.log(`🔄 Pushing local context (${project.name}) -> ${targetUrl} ...`);
+        console.log(`🔄 Pushing local context (${project.name}) -> ${targetUrl} [Machine: ${machineId}] ...`);
 
         for (const t of tasks) {
           if (flags.task && t.task_id !== flags.task) continue;
@@ -1036,8 +1042,8 @@ VectorForce Harness Configuration:
               projectId: remoteProjectId,
               taskId: t.task_id,
               title: t.title || t.task_id,
-              assignee: `${process.env.USER || 'developer'}@local-mac`,
-              role: `Local Workspace (${basename(cwd)})`,
+              assignee: devIdentity,
+              role: `Workspace (${basename(cwd)})`,
               priority: 'P0',
               machineId,
               harness: flags.harness || 'antigravity'
@@ -1062,13 +1068,17 @@ VectorForce Harness Configuration:
               taskId: cp.task_id,
               senderMachineId: machineId,
               recipientMachineId: 'computer-2-meta-muse-cloud',
-              authorName: `${cp.author?.name || process.env.USER || 'developer'} (${basename(cwd)})`,
-              authorHarness: cp.author?.harness || 'antigravity',
+              authorName: `${cp.author?.name || devIdentity} (${basename(cwd)})`,
+              authorHarness: cp.author?.harness || flags.harness || 'antigravity',
               summary: cp.summary,
               goals: cp.claims?.goals || [],
               constraints: cp.claims?.constraints || [],
               decisions: cp.claims?.decisions || [],
-              nextSteps: cp.claims?.next_steps || []
+              nextSteps: cp.claims?.next_steps || [],
+              gitCommit: cp.evidence?.git?.commit || null,
+              gitBranch: cp.evidence?.git?.branch || 'main',
+              gitDirty: cp.evidence?.git?.dirty !== undefined ? Boolean(cp.evidence.git.dirty) : false,
+              documents: (cp.evidence?.documents || []).map((d) => d.path)
             })
           });
           lastResp = await res.json();

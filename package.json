@@ -1,6 +1,6 @@
 {
   "name": "vectorforce",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Portable engineering context platform - Git for AI context",
   "type": "module",
   "main": "src/index.js",

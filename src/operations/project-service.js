@@ -1,6 +1,7 @@
 import { Authorizer } from '../policy/authorizer.js';
 import { sha256 } from '../core/hash.js';
 import { basename, dirname } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { ErrorCode, VectorForceError } from '../core/errors.js';
 
 export class ProjectService {
@@ -13,6 +14,8 @@ export class ProjectService {
 
   /**
    * Initialize or retrieve a project for a workspace directory.
+   * Derives a deterministic project identity from Git remote URL if present,
+   * ensuring that multiple developers cloning the same repo share the identical project ID.
    * @param {string} workspacePath
    * @param {string} [customName]
    * @returns {{ project_id: string, canonical_path: string, name: string, created_at: string }}
@@ -23,7 +26,21 @@ export class ProjectService {
     if (existing) {
       return existing;
     }
-    const idHash = sha256(canonical).slice(0, 16);
+
+    let identitySeed = canonical;
+    try {
+      const gitRemote = execFileSync('git', ['config', '--get', 'remote.origin.url'], {
+        cwd: canonical,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        timeout: 1000
+      }).trim();
+      if (gitRemote) {
+        identitySeed = gitRemote.toLowerCase();
+      }
+    } catch {}
+
+    const idHash = sha256(identitySeed).slice(0, 16);
     const projectId = `proj-${idHash}`;
     const name = customName || basename(canonical);
     return this.store.registerProject(projectId, canonical, name);

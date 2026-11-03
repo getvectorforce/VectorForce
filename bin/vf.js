@@ -146,7 +146,7 @@ function printUsage() {
 VectorForce (vf) - Git for AI Engineering Context
 
 Usage:
-  vf init [project_name]                     Initialize current workspace
+  vf init [project_name] [--harness <id|all|none>]  Init workspace (auto-detects harnesses)
   vf task <id> [title]                       Create or register a task
   vf tasks [active|completed|all]            List tasks in workspace
   vf policy list                             List allowed document paths
@@ -162,7 +162,7 @@ Usage:
   vf studio [options]                        Launch VectorForce Studio web control center
   vf ui [options]                            Alias for vf studio
   vf mcp                                     Start stdio MCP server for Antigravity / Command Code
-  vf config                                  Display MCP configuration snippet for harnesses
+  vf config list|install|doctor               List, install, or check harness MCP integrations
   vf help                                    Show this help
 
 Checkpoint options:
@@ -235,7 +235,15 @@ function parseFlags(args) {
         rationale: parts.slice(2).join(':') || 'Approved architecture decision'
       });
     } else if (arg === '--harness' && args[i + 1]) {
-      flags.harness = args[++i];
+      const harnessValue = args[++i];
+      flags.harness = harnessValue;
+      flags.harnessList = (flags.harnessList || []).concat(
+        harnessValue.split(',').map((value) => value.trim()).filter(Boolean)
+      );
+    } else if (arg === '--all') {
+      flags.all = true;
+    } else if (arg === '--none') {
+      flags.none = true;
     } else if (arg === '--author' && args[i + 1]) {
       flags.author = args[++i];
     } else if (arg === '--next' && args[i + 1]) {
@@ -330,14 +338,34 @@ async function main() {
       case 'init': {
         const name = args[1] && !args[1].startsWith('--') ? args[1] : null;
         const project = projectService.initProject(cwd, name);
-        HarnessConfig.installAntigravity(cwd);
-        HarnessConfig.installCommandCode(cwd);
-        HarnessConfig.installMuseCode(cwd);
-        HarnessConfig.installCodex(cwd);
-        HarnessConfig.installCursor(cwd);
-        HarnessConfig.installWindsurf(cwd);
-        HarnessConfig.installCopilot(cwd);
-        HarnessConfig.installKiro(cwd);
+        const harnessRequest = flags.harnessList && flags.harnessList.length > 0 ? flags.harnessList : null;
+        let harnessTargets = [];
+        if (flags.all || (harnessRequest && harnessRequest.some((h) => h.toLowerCase() === 'all'))) {
+          harnessTargets = HarnessConfig.getSupportedHarnesses().map((h) => h.id);
+        } else if (flags.none || (harnessRequest && harnessRequest.some((h) => h.toLowerCase() === 'none'))) {
+          harnessTargets = [];
+        } else if (harnessRequest) {
+          const unknown = [];
+          for (const requested of harnessRequest) {
+            const resolved = HarnessConfig.resolveHarnessId(requested);
+            if (resolved && !harnessTargets.includes(resolved)) harnessTargets.push(resolved);
+            else if (!resolved) unknown.push(requested);
+          }
+          if (unknown.length > 0) {
+            console.error(`Unknown harness: ${unknown.join(', ')}. Run "vf config list" for supported values.`);
+            process.exit(1);
+          }
+        } else {
+          harnessTargets = HarnessConfig.detectHarnesses(cwd).map((h) => h.id);
+        }
+        const installedHarnesses = [];
+        for (const id of harnessTargets) {
+          try {
+            installedHarnesses.push({ id, path: HarnessConfig.installHarness(cwd, id) });
+          } catch (err) {
+            console.warn(`Warning: failed to configure ${id}: ${err.message}`);
+          }
+        }
         const agentsMdPath = join(cwd, 'AGENTS.md');
         if (!existsSync(agentsMdPath)) {
           writeFileSync(
@@ -347,6 +375,13 @@ async function main() {
           );
         }
         console.log(`Initialized VectorForce project: ${project.name} (${project.project_id})`);
+        if (installedHarnesses.length > 0) {
+          console.log(`Configured harness integration(s): ${installedHarnesses.map((h) => h.id).join(', ')}`);
+          console.log('For other harnesses, run "vf config list" or "vf config install <harness|all>".');
+        } else {
+          console.log('No harness detected, so no MCP configs were created.');
+          console.log('Run "vf config list" to see supported harnesses, then "vf config install <harness>".');
+        }
         break;
       }
 
@@ -551,6 +586,8 @@ async function main() {
       }
 
       case 'mcp': {
+        console.log = (...args) => console.error(...args);
+        console.info = (...args) => console.error(...args);
         const server = new McpServer({ store, projectService, checkpointService, briefingService, handoffService, reasoningService }, cwd);
         server.connect(process.stdin, process.stdout);
         process.on('SIGINT', () => {
@@ -568,42 +605,48 @@ async function main() {
       case 'config': {
         const sub = args[1];
         if (sub === 'install' || sub === 'setup') {
-          const target = (args[2] || 'all').toLowerCase();
+          const raw = (args[2] || 'all').toLowerCase();
+          const installNotes = {
+            antigravity: (p) => `Google Antigravity -> ${p} (+ global ~/.gemini MCP config when present)`,
+            'command-code': (p) => `Command Code / Claude Code -> .mcp.json & ${p}`,
+            muse: (p) => `Meta Muse -> ${p} (+ ~/.config/muse/settings.json)`,
+            codex: (p) => `Codex -> ${p} (+ ~/.codex/config.toml)`,
+            cursor: (p) => `Cursor -> ${p} (+ .cursorrules)`,
+            windsurf: (p) => `Windsurf -> ${p} (+ .windsurfrules)`,
+            copilot: (p) => `GitHub Copilot / VS Code -> ${p} (+ .github/copilot-instructions.md)`,
+            kiro: (p) => `Kiro IDE -> ${p} (+ kiro.json)`
+          };
+          let targets = [];
+          if (raw === 'all') {
+            targets = HarnessConfig.getSupportedHarnesses().map((h) => h.id);
+          } else {
+            const resolved = HarnessConfig.resolveHarnessId(raw);
+            if (!resolved) {
+              console.error(`Unknown harness "${args[2]}". Run "vf config list" for supported values.`);
+              process.exit(1);
+            }
+            targets = [resolved];
+          }
           const installed = [];
-          if (target === 'antigravity' || target === 'all') {
-            const p = HarnessConfig.installAntigravity(cwd);
-            installed.push(`Google Antigravity -> ${p} (+ ~/.gemini/antigravity/mcp_config.json)`);
-          }
-          if (target === 'command-code' || target === 'cmd' || target === 'claude' || target === 'claude-code' || target === 'all') {
-            const p = HarnessConfig.installCommandCode(cwd);
-            installed.push(`Command Code / Claude Code -> .mcp.json & ${p}`);
-          }
-          if (target === 'muse' || target === 'muse-code' || target === 'all') {
-            const p = HarnessConfig.installMuseCode(cwd);
-            installed.push(`Meta Muse -> ${p} (+ ~/.config/muse/settings.json)`);
-          }
-          if (target === 'codex' || target === 'all') {
-            const p = HarnessConfig.installCodex(cwd);
-            installed.push(`Codex -> ${p} (+ ~/.codex/config.toml)`);
-          }
-          if (target === 'cursor' || target === 'all') {
-            const p = HarnessConfig.installCursor(cwd);
-            installed.push(`Cursor -> ${p} (+ .cursorrules)`);
-          }
-          if (target === 'windsurf' || target === 'all') {
-            const p = HarnessConfig.installWindsurf(cwd);
-            installed.push(`Windsurf -> ${p} (+ .windsurfrules)`);
-          }
-          if (target === 'copilot' || target === 'github-copilot' || target === 'vscode' || target === 'all') {
-            const p = HarnessConfig.installCopilot(cwd);
-            installed.push(`GitHub Copilot / VS Code -> ${p} (+ .github/copilot-instructions.md)`);
-          }
-          if (target === 'kiro' || target === 'kiro-ide' || target === 'all') {
-            const p = HarnessConfig.installKiro(cwd);
-            installed.push(`Kiro IDE -> ${p} (+ kiro.json)`);
+          for (const id of targets) {
+            installed.push(installNotes[id](HarnessConfig.installHarness(cwd, id)));
           }
           console.log(`\n✔ Configured harness integration(s):\n  - ${installed.join('\n  - ')}`);
           console.log(`\n💡 Next step: Restart or reload your AI agent, then ask in chat:\n   "List active VectorForce tasks and check workspace drift"`);
+          break;
+        }
+
+        if (sub === 'list' || sub === 'harnesses') {
+          const detected = new Set(HarnessConfig.detectHarnesses(cwd).map((h) => h.id));
+          console.log(`\nSupported AI harnesses (${cwd}):\n`);
+          for (const harness of HarnessConfig.getSupportedHarnesses()) {
+            const aliases = harness.aliases ? ` (aliases: ${harness.aliases.join(', ')})` : '';
+            const detectedMark = detected.has(harness.id) ? 'detected' : 'not detected';
+            const configuredMark = HarnessConfig.isHarnessConfigured(cwd, harness.id) ? 'configured' : 'not configured';
+            console.log(`  ${harness.id}${aliases}: ${harness.label} [${detectedMark}] [${configuredMark}]`);
+          }
+          console.log('\nSetup one harness: vf config install <harness>   (e.g. vf config install cursor)');
+          console.log('Setup all harnesses: vf config install all\n');
           break;
         }
 
@@ -611,14 +654,14 @@ async function main() {
           const checks = [
             { name: 'SQLite Database (.vectorforce/vectorforce.db)', ok: existsSync(getDbPath(cwd)), path: getDbPath(cwd) },
             { name: 'Agent Protocol Rules (AGENTS.md)', ok: existsSync(join(cwd, 'AGENTS.md')), path: join(cwd, 'AGENTS.md') },
-            { name: 'Google Antigravity (.agents/mcp_config.json)', ok: existsSync(join(cwd, '.agents', 'mcp_config.json')), path: join(cwd, '.agents', 'mcp_config.json') },
-            { name: 'Claude Code & Command Code (.mcp.json)', ok: existsSync(join(cwd, '.mcp.json')), path: join(cwd, '.mcp.json') },
-            { name: 'Meta Muse (.muse/mcp_config.json)', ok: existsSync(join(cwd, '.muse', 'mcp_config.json')), path: join(cwd, '.muse', 'mcp_config.json') },
-            { name: 'OpenAI Codex (.codex/config.toml)', ok: existsSync(join(cwd, '.codex', 'config.toml')), path: join(cwd, '.codex', 'config.toml') },
-            { name: 'Cursor (.cursor/mcp.json)', ok: existsSync(join(cwd, '.cursor', 'mcp.json')), path: join(cwd, '.cursor', 'mcp.json') },
-            { name: 'Windsurf (.windsurf/mcp_config.json)', ok: existsSync(join(cwd, '.windsurf', 'mcp_config.json')), path: join(cwd, '.windsurf', 'mcp_config.json') },
-            { name: 'GitHub Copilot / VS Code (.vscode/mcp.json)', ok: existsSync(join(cwd, '.vscode', 'mcp.json')), path: join(cwd, '.vscode', 'mcp.json') },
-            { name: 'Kiro IDE (.kiro/mcp.json)', ok: existsSync(join(cwd, '.kiro', 'mcp.json')), path: join(cwd, '.kiro', 'mcp.json') }
+            { name: 'Google Antigravity (.agents/mcp_config.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'antigravity'), path: join(cwd, '.agents', 'mcp_config.json') },
+            { name: 'Claude Code & Command Code (.mcp.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'command-code'), path: join(cwd, '.mcp.json') },
+            { name: 'Meta Muse (.muse/mcp_config.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'muse'), path: join(cwd, '.muse', 'mcp_config.json') },
+            { name: 'OpenAI Codex (.codex/config.toml)', ok: HarnessConfig.isHarnessConfigured(cwd, 'codex'), path: join(cwd, '.codex', 'config.toml') },
+            { name: 'Cursor (.cursor/mcp.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'cursor'), path: join(cwd, '.cursor', 'mcp.json') },
+            { name: 'Windsurf (.windsurf/mcp_config.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'windsurf'), path: join(cwd, '.windsurf', 'mcp_config.json') },
+            { name: 'GitHub Copilot / VS Code (.vscode/mcp.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'copilot'), path: join(cwd, '.vscode', 'mcp.json') },
+            { name: 'Kiro IDE (.kiro/settings/mcp.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'kiro'), path: join(cwd, '.kiro', 'settings', 'mcp.json') }
           ];
           console.log(`\nVectorForce Workspace & MCP Health Check (${cwd}):\n`);
           for (const c of checks) {
@@ -631,31 +674,22 @@ async function main() {
         }
 
         if (sub === 'uninstall' || sub === 'remove') {
-          const target = (args[2] || 'all').toLowerCase();
+          const raw = (args[2] || 'all').toLowerCase();
+          const displayNames = { antigravity: 'Antigravity', 'command-code': 'Command Code', muse: 'Muse Code', codex: 'Codex', cursor: 'Cursor', windsurf: 'Windsurf', copilot: 'GitHub Copilot / VS Code', kiro: 'Kiro IDE' };
+          let targets = [];
+          if (raw === 'all') {
+            targets = HarnessConfig.getSupportedHarnesses().map((h) => h.id);
+          } else {
+            const resolved = HarnessConfig.resolveHarnessId(raw);
+            if (!resolved) {
+              console.error(`Unknown harness "${args[2]}". Run "vf config list" for supported values.`);
+              process.exit(1);
+            }
+            targets = [resolved];
+          }
           const uninstalled = [];
-          if (target === 'antigravity' || target === 'all') {
-            if (HarnessConfig.uninstallAntigravity(cwd)) uninstalled.push('Antigravity');
-          }
-          if (target === 'command-code' || target === 'cmd' || target === 'all') {
-            if (HarnessConfig.uninstallCommandCode(cwd)) uninstalled.push('Command Code');
-          }
-          if (target === 'muse' || target === 'muse-code' || target === 'all') {
-            if (HarnessConfig.uninstallMuseCode(cwd)) uninstalled.push('Muse Code');
-          }
-          if (target === 'codex' || target === 'all') {
-            if (HarnessConfig.uninstallCodex(cwd)) uninstalled.push('Codex');
-          }
-          if (target === 'cursor' || target === 'all') {
-            if (HarnessConfig.uninstallCursor(cwd)) uninstalled.push('Cursor');
-          }
-          if (target === 'windsurf' || target === 'all') {
-            if (HarnessConfig.uninstallWindsurf(cwd)) uninstalled.push('Windsurf');
-          }
-          if (target === 'copilot' || target === 'github-copilot' || target === 'vscode' || target === 'all') {
-            if (HarnessConfig.uninstallCopilot(cwd)) uninstalled.push('GitHub Copilot / VS Code');
-          }
-          if (target === 'kiro' || target === 'kiro-ide' || target === 'all') {
-            if (HarnessConfig.uninstallKiro(cwd)) uninstalled.push('Kiro IDE');
+          for (const id of targets) {
+            if (HarnessConfig.uninstallHarness(cwd, id)) uninstalled.push(displayNames[id]);
           }
           console.log(`\n✔ Removed harness integration(s): ${uninstalled.length ? uninstalled.join(', ') : 'none found'}`);
           break;
@@ -879,7 +913,7 @@ VectorForce Harness Configuration:
    {
      "mcpServers": {
        "vectorforce": {
-         "command": "node",
+         "command": "${process.execPath}",
          "args": ["${binPath}", "mcp"]
        }
      }
@@ -891,7 +925,7 @@ VectorForce Harness Configuration:
    {
      "mcpServers": {
        "vectorforce": {
-         "command": "node",
+         "command": "${process.execPath}",
          "args": ["${binPath}", "mcp"],
          "env": { "VF_HARNESS": "muse-code" }
        }
@@ -906,7 +940,7 @@ VectorForce Harness Configuration:
    File: .codex/config.toml (or codex.json)
    Content:
    [mcp_servers.vectorforce]
-   command = "node"
+   command = "${process.execPath}"
    args = ["${binPath}", "mcp"]
    [mcp_servers.vectorforce.env]
    VF_HARNESS = "codex"
@@ -943,6 +977,9 @@ VectorForce Harness Configuration:
      VF_OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash-1017  # default
 
    Privacy: set VF_LLM_ALLOW_CODE=false (or run with --no-code) to keep source out of the prompt.
+
+   Harnesses: run "vf config list" to see detected/configured harnesses,
+   then "vf config install <harness|all>" to configure one or all of them.
 `);
         break;
       }
@@ -1134,14 +1171,14 @@ VectorForce Harness Configuration:
         const checks = [
           { name: 'SQLite Database (.vectorforce/vectorforce.db)', ok: existsSync(getDbPath(cwd)) },
           { name: 'Agent Protocol Rules (AGENTS.md)', ok: existsSync(join(cwd, 'AGENTS.md')) },
-          { name: 'Google Antigravity (.agents/mcp_config.json)', ok: existsSync(join(cwd, '.agents', 'mcp_config.json')) },
-          { name: 'Claude Code & Command Code (.mcp.json)', ok: existsSync(join(cwd, '.mcp.json')) },
-          { name: 'Meta Muse (.muse/mcp_config.json or musecode.json)', ok: existsSync(join(cwd, '.muse', 'mcp_config.json')) || existsSync(join(cwd, 'musecode.json')) },
-          { name: 'OpenAI Codex (.codex/config.toml)', ok: existsSync(join(cwd, '.codex', 'config.toml')) },
-          { name: 'Cursor (.cursor/mcp.json)', ok: existsSync(join(cwd, '.cursor', 'mcp.json')) },
-          { name: 'Windsurf (.windsurf/mcp_config.json)', ok: existsSync(join(cwd, '.windsurf', 'mcp_config.json')) },
-          { name: 'GitHub Copilot / VS Code (.vscode/mcp.json)', ok: existsSync(join(cwd, '.vscode', 'mcp.json')) },
-          { name: 'Kiro IDE (.kiro/mcp.json)', ok: existsSync(join(cwd, '.kiro', 'mcp.json')) }
+          { name: 'Google Antigravity (.agents/mcp_config.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'antigravity') },
+          { name: 'Claude Code & Command Code (.mcp.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'command-code') },
+          { name: 'Meta Muse (.muse/mcp_config.json or musecode.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'muse') },
+          { name: 'OpenAI Codex (.codex/config.toml)', ok: HarnessConfig.isHarnessConfigured(cwd, 'codex') },
+          { name: 'Cursor (.cursor/mcp.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'cursor') },
+          { name: 'Windsurf (.windsurf/mcp_config.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'windsurf') },
+          { name: 'GitHub Copilot / VS Code (.vscode/mcp.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'copilot') },
+          { name: 'Kiro IDE (.kiro/settings/mcp.json)', ok: HarnessConfig.isHarnessConfigured(cwd, 'kiro') }
         ];
         console.log(`\nVectorForce Workspace & MCP Status (${cwd}):\n`);
         for (const c of checks) {

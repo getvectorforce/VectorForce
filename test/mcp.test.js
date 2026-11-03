@@ -238,7 +238,7 @@ test('HarnessConfig: Reversible Antigravity installation and uninstall', () => {
     assert.ok(existsSync(installedPath));
 
     const installedJson = JSON.parse(readFileSync(installedPath, 'utf8'));
-    assert.strictEqual(installedJson.mcpServers.vectorforce.command, 'node');
+    assert.strictEqual(installedJson.mcpServers.vectorforce.command, HarnessConfig.getNodeCommand());
     assert.ok(installedJson.mcpServers.vectorforce.args.includes('mcp'));
 
     // 3. Re-install is idempotent (does not duplicate)
@@ -353,7 +353,7 @@ test('HarnessConfig: Reversible Cursor installation and uninstall', () => {
     assert.ok(existsSync(join(fixture.workspacePath, '.cursorrules')));
 
     const config = JSON.parse(readFileSync(installedPath, 'utf8'));
-    assert.strictEqual(config.mcpServers.vectorforce.command, 'node');
+    assert.strictEqual(config.mcpServers.vectorforce.command, HarnessConfig.getNodeCommand());
     assert.strictEqual(config.mcpServers.vectorforce.env.VF_HARNESS, 'cursor');
 
     // Uninstall
@@ -380,7 +380,7 @@ test('HarnessConfig: Reversible Windsurf installation and uninstall', () => {
     assert.ok(existsSync(join(fixture.workspacePath, '.windsurfrules')));
 
     const config = JSON.parse(readFileSync(installedPath, 'utf8'));
-    assert.strictEqual(config.mcpServers.vectorforce.command, 'node');
+    assert.strictEqual(config.mcpServers.vectorforce.command, HarnessConfig.getNodeCommand());
     assert.strictEqual(config.mcpServers.vectorforce.env.VF_HARNESS, 'windsurf');
 
     // Uninstall
@@ -399,7 +399,7 @@ test('HarnessConfig: Reversible GitHub Copilot installation and uninstall', () =
   try {
     const preview = HarnessConfig.previewCopilot(fixture.workspacePath);
     assert.ok(preview.filePath.includes('.vscode'));
-    assert.ok(preview.mergedContent.mcpServers.vectorforce);
+    assert.ok(preview.mergedContent.servers.vectorforce);
 
     // Install
     const installedPath = HarnessConfig.installCopilot(fixture.workspacePath);
@@ -407,15 +407,15 @@ test('HarnessConfig: Reversible GitHub Copilot installation and uninstall', () =
     assert.ok(existsSync(join(fixture.workspacePath, '.github', 'copilot-instructions.md')));
 
     const config = JSON.parse(readFileSync(installedPath, 'utf8'));
-    assert.strictEqual(config.mcpServers.vectorforce.command, 'node');
-    assert.strictEqual(config.mcpServers.vectorforce.env.VF_HARNESS, 'copilot');
+    assert.strictEqual(config.servers.vectorforce.command, HarnessConfig.getNodeCommand());
+    assert.strictEqual(config.servers.vectorforce.env.VF_HARNESS, 'copilot');
 
     // Uninstall
     const removed = HarnessConfig.uninstallCopilot(fixture.workspacePath);
     assert.strictEqual(removed, true);
 
     const post = JSON.parse(readFileSync(installedPath, 'utf8'));
-    assert.strictEqual(post.mcpServers.vectorforce, undefined);
+    assert.strictEqual(post.servers?.vectorforce, undefined);
   } finally {
     fixture.cleanup();
   }
@@ -432,10 +432,10 @@ test('HarnessConfig: Reversible Kiro IDE installation and uninstall', () => {
     const installedPath = HarnessConfig.installKiro(fixture.workspacePath);
     assert.ok(existsSync(installedPath));
     assert.ok(existsSync(preview.kiroJsonPath));
-    assert.ok(existsSync(join(fixture.workspacePath, '.kiro', 'rules.md')));
+    assert.ok(existsSync(join(fixture.workspacePath, '.kiro', 'steering', 'vectorforce.md')));
 
     const config = JSON.parse(readFileSync(installedPath, 'utf8'));
-    assert.strictEqual(config.mcpServers.vectorforce.command, 'node');
+    assert.strictEqual(config.mcpServers.vectorforce.command, HarnessConfig.getNodeCommand());
     assert.strictEqual(config.mcpServers.vectorforce.env.VF_HARNESS, 'kiro');
 
     // Uninstall

@@ -1,11 +1,18 @@
 {
   "mcpServers": {
     "vectorforce": {
+      "type": "stdio",
       "command": "node",
       "args": [
-        "/Users/omprakashprajapat/AgentAI/VectorForce/bin/vf.js",
+        "C:/Users/Lenovo/AgenticAI/VectorForce/bin/vf.js",
         "mcp"
       ]
+    },
+    "vectorforce-cloud": {
+      "serverUrl": "https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.us-east.modal.run/v1/sse",
+      "headers": {
+        "Authorization": "Bearer vf_live_sub_98a7bc65f012e4d9"
+      }
     }
   }
 }

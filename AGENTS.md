@@ -76,15 +76,15 @@ VectorForce/
 └── wiki/                          # Local-only ADRs and planning (gitignored)
 ```
 
-### Generated Harness Configs in Workspace Root (`vf init`):
+### Harness Configs (`vf init` / `vf config install`):
 - `.mcp.json`, `commandcode.json` — Claude Code & Command Code
 - `.agents/mcp_config.json` — Google Antigravity
 - `.muse/mcp_config.json`, `musecode.json` — Meta Muse
 - `.codex/config.toml`, `codex.json` — OpenAI Codex CLI
 - `.cursor/mcp.json`, `.cursorrules` — Cursor IDE
 - `.windsurf/mcp_config.json`, `.windsurfrules` — Windsurf Cascade
-- `.vscode/mcp.json`, `.github/copilot-instructions.md` — GitHub Copilot
-- `.kiro/mcp.json`, `.kiro/rules.md` — Kiro IDE
+- `.vscode/mcp.json` (`servers`) — GitHub Copilot
+- `.kiro/settings/mcp.json`, `kiro.json` — Kiro IDE
 
 ---
 

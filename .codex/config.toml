@@ -1,5 +1,5 @@
 [mcp_servers.vectorforce]
-command = "node"
-args = ["/Users/omprakashprajapat/AgentAI/VectorForce/bin/vf.js", "mcp"]
+command = "C:\\Program Files\\nodejs\\node.exe"
+args = ["C:\\Users\\Lenovo\\AgenticAI\\VectorForce\\bin\\vf.js", "mcp"]
 [mcp_servers.vectorforce.env]
 VF_HARNESS = "codex"

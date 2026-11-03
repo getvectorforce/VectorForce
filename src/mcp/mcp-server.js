@@ -1,6 +1,34 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ErrorCode, VectorForceError } from '../core/errors.js';
 
-export const MCP_PROTOCOL_VERSION = '2024-11-05';
+export const MCP_PROTOCOL_VERSION = '2025-11-25';
+
+export const MCP_SUPPORTED_PROTOCOL_VERSIONS = [
+  '2025-11-25',
+  '2025-06-18',
+  '2025-03-26',
+  '2024-11-05'
+];
+
+function readServerVersion() {
+  try {
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
+    return JSON.parse(readFileSync(pkgPath, 'utf8')).version || '0.3.2';
+  } catch {
+    return '0.3.2';
+  }
+}
+
+export const MCP_SERVER_VERSION = readServerVersion();
+
+export function negotiateProtocolVersion(clientVersion) {
+  if (clientVersion && MCP_SUPPORTED_PROTOCOL_VERSIONS.includes(clientVersion)) {
+    return clientVersion;
+  }
+  return MCP_PROTOCOL_VERSION;
+}
 
 export const MCP_TOOLS = [
   {
@@ -214,14 +242,31 @@ export class McpServer {
       return;
     }
 
-    const { id, method, params } = req;
-
-    // Notifications (no id)
-    if (id === undefined || id === null) {
-      if (method === 'notifications/initialized') {
-        // Client handshake complete
+    // JSON-RPC batch: dispatch each entry; entries without an id are notifications.
+    if (Array.isArray(req)) {
+      if (req.length === 0) {
+        this._sendError(null, -32600, 'Invalid Request: empty batch');
         return;
       }
+      for (const sub of req) {
+        this._dispatch(sub);
+      }
+      return;
+    }
+
+    this._dispatch(req);
+  }
+
+  _dispatch(req) {
+    if (!req || typeof req !== 'object' || Array.isArray(req)) {
+      this._sendError(null, -32600, 'Invalid Request');
+      return;
+    }
+
+    const { id, method, params } = req;
+
+    // Notifications (no id) are acknowledged silently, never answered.
+    if (id === undefined || id === null) {
       return;
     }
 
@@ -229,15 +274,17 @@ export class McpServer {
       switch (method) {
         case 'initialize': {
           this._sendResult(id, {
-            protocolVersion: MCP_PROTOCOL_VERSION,
+            protocolVersion: negotiateProtocolVersion(params?.protocolVersion),
             serverInfo: {
               name: 'vectorforce',
-              version: '0.1.0'
+              version: MCP_SERVER_VERSION
             },
             capabilities: {
               tools: {
                 listChanged: false
-              }
+              },
+              resources: {},
+              prompts: {}
             }
           });
           break;
@@ -252,6 +299,31 @@ export class McpServer {
           this._sendResult(id, {
             tools: MCP_TOOLS
           });
+          break;
+        }
+
+        case 'resources/list': {
+          this._sendResult(id, { resources: [] });
+          break;
+        }
+
+        case 'resources/templates/list': {
+          this._sendResult(id, { resourceTemplates: [] });
+          break;
+        }
+
+        case 'resources/read': {
+          this._sendError(id, -32602, `Unknown resource: ${params?.uri || '(missing uri)'}`);
+          break;
+        }
+
+        case 'prompts/list': {
+          this._sendResult(id, { prompts: [] });
+          break;
+        }
+
+        case 'prompts/get': {
+          this._sendError(id, -32602, `Unknown prompt: ${params?.name || '(missing name)'}`);
           break;
         }
 

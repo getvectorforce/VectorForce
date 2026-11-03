@@ -47,9 +47,12 @@ node bin/vf.js studio
 
 ## Quickstart
 
-### 1. Initialize a Project
+### 1. Initialize a Project (auto-detects your AI harness)
 ```bash
 node bin/vf.js init
+# Only detected harnesses are configured; repos with no harness get no MCP files yet.
+node bin/vf.js config list                  # supported harnesses + detected/configured status
+node bin/vf.js config install cursor       # or: --harness on init, or install all
 ```
 
 ### 2. Create and Select a Task
@@ -139,19 +142,19 @@ node bin/vf.js studio
 
 VectorForce exposes a standard stdio JSON-RPC MCP server for direct integration into **Google Antigravity**, **Claude Code**, **Command Code**, **Meta Muse**, **OpenAI Codex**, **Cursor**, **Windsurf**, **GitHub Copilot**, and **Kiro IDE**.
 
-> **How MCP Starts:** You **never** need to run `vf mcp` manually in a terminal. Each AI coding agent reads its configuration file below and automatically spawns VectorForce in the background over `stdio`.
+> **How MCP Starts:** You **never** need to run `vf mcp` manually in a terminal. Each AI coding agent reads its configuration file below and automatically spawns VectorForce in the background over `stdio`. Generated entries use the absolute Node.js runtime path, so GUI-launched clients find it even when `node` is not on their PATH (common on Windows).
 
 | AI Coding Client | Config File Read by Client | 1-Command Auto-Setup |
 |---|---|---|
-| **Google Antigravity** | `.agents/mcp_config.json` & `~/.gemini/antigravity/mcp_config.json` | `node bin/vf.js config install antigravity` |
+| **Google Antigravity** | `.agents/mcp_config.json` & `~/.gemini/config/mcp_config.json` (or `~/.gemini/antigravity/mcp_config.json`) | `node bin/vf.js config install antigravity` |
 | **Claude Code (`claude`)** | `.mcp.json` (project root) | `node bin/vf.js config install claude-code` |
 | **Command Code (`cmd`)** | `.mcp.json` & `commandcode.json` | `node bin/vf.js config install command-code` |
-| **Meta Muse (`muse`)** | `.muse/mcp_config.json` & `~/.config/muse/settings.json` | `node bin/vf.js config install muse` |
+| **Meta Muse (`muse`)** | `~/.config/muse/settings.json` (global `mcpServers`; `.muse/mcp_config.json` kept as mirror) | `node bin/vf.js config install muse` |
 | **OpenAI Codex (`codex`)** | `.codex/config.toml` & `~/.codex/config.toml` | `node bin/vf.js config install codex` |
 | **Cursor IDE** | `.cursor/mcp.json` & `.cursorrules` | `node bin/vf.js config install cursor` |
 | **Windsurf (Codeium)** | `.windsurf/mcp_config.json` & `.windsurfrules` | `node bin/vf.js config install windsurf` |
-| **GitHub Copilot / VS Code** | `.vscode/mcp.json` & `.github/copilot-instructions.md` | `node bin/vf.js config install copilot` |
-| **Kiro IDE** | `.kiro/mcp.json` & `kiro.json` | `node bin/vf.js config install kiro` |
+| **GitHub Copilot / VS Code** | `.vscode/mcp.json` (top-level `servers`) & `.github/copilot-instructions.md` | `node bin/vf.js config install copilot` |
+| **Kiro IDE** | `.kiro/settings/mcp.json` & `kiro.json` | `node bin/vf.js config install kiro` |
 
 ### Automated Configuration & Health Check
 ```bash
@@ -167,7 +170,7 @@ node bin/vf.js status
 {
   "mcpServers": {
     "vectorforce": {
-      "command": "node",
+      "command": "/absolute/path/to/node",
       "args": ["/absolute/path/to/VectorForce/bin/vf.js", "mcp"]
     }
   }
@@ -177,7 +180,7 @@ node bin/vf.js status
 ### TOML Configuration (OpenAI Codex CLI: `.codex/config.toml`)
 ```toml
 [mcp_servers.vectorforce]
-command = "node"
+command = "/absolute/path/to/node"
 args = ["/absolute/path/to/VectorForce/bin/vf.js", "mcp"]
 [mcp_servers.vectorforce.env]
 VF_HARNESS = "codex"

@@ -1,4 +1,4 @@
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, realpathSync } from 'node:fs';
@@ -19,7 +19,177 @@ export class HarnessConfig {
    * Get the absolute path to bin/vf.js (cross-platform: macOS, Linux, Windows)
    */
   static getBinPath() {
-    return fileURLToPath(new URL('../../bin/vf.js', import.meta.url));
+    const raw = fileURLToPath(new URL('../../bin/vf.js', import.meta.url));
+    return process.platform === 'win32' ? raw.replace(/\\/g, '/') : raw;
+  }
+
+  /**
+   * Absolute path of the Node.js runtime used to spawn `vf mcp`.
+   * GUI-spawned MCP clients (VS Code, Cursor, ...) on Windows often lack
+   * `node` on PATH, so generated configs must never rely on bare `node`.
+   */
+  static getNodeCommand() {
+    return process.execPath;
+  }
+
+  /**
+   * Escape a value for embedding in a TOML basic string.
+   */
+  static _tomlString(value) {
+    return '"' + String(value).split('\\').join('\\\\').split('"').join('\\"') + '"';
+  }
+
+  /**
+   * Canonical registry of supported harnesses.
+   * markers: workspace-relative files/dirs whose presence indicates the harness is in use.
+   */
+  static getSupportedHarnesses() {
+    return [
+      { id: 'antigravity', label: 'Google Antigravity', markers: ['.agents', '.gemini'], files: ['.agents/mcp_config.json'] },
+      { id: 'command-code', label: 'Claude Code / Command Code', aliases: ['claude-code', 'claude', 'cmd'], markers: ['.mcp.json', 'commandcode.json', '.claude', 'CLAUDE.md'], files: ['.mcp.json', 'commandcode.json'] },
+      { id: 'muse', label: 'Meta Muse', aliases: ['muse-code'], markers: ['.muse', 'musecode.json'], files: ['.muse/mcp_config.json', 'musecode.json'] },
+      { id: 'codex', label: 'OpenAI Codex', markers: ['.codex', 'codex.json'], files: ['.codex/config.toml', 'codex.json'] },
+      { id: 'cursor', label: 'Cursor', markers: ['.cursor', '.cursorrules'], files: ['.cursor/mcp.json'] },
+      { id: 'windsurf', label: 'Windsurf', markers: ['.windsurf', '.windsurfrules'], files: ['.windsurf/mcp_config.json'] },
+      { id: 'copilot', label: 'GitHub Copilot / VS Code', aliases: ['github-copilot', 'vscode'], markers: ['.vscode', '.github/copilot-instructions.md', '.github/muse-instructions.md'], files: ['.vscode/mcp.json'] },
+      { id: 'kiro', label: 'Kiro IDE', aliases: ['kiro-ide'], markers: ['.kiro', 'kiro.json'], files: ['.kiro/settings/mcp.json'] }
+    ];
+  }
+
+  /**
+   * Resolve a user-supplied harness name or alias to its canonical id.
+   * @returns {string|null}
+   */
+  static resolveHarnessId(input) {
+    const normalized = String(input || '').trim().toLowerCase();
+    if (!normalized) return null;
+    for (const harness of HarnessConfig.getSupportedHarnesses()) {
+      if (harness.id === normalized || (harness.aliases || []).includes(normalized)) {
+        return harness.id;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Detect harnesses already in use by the workspace (marker files/dirs).
+   * @returns {{ id: string, label: string, matched: string[] }[]}
+   */
+  static detectHarnesses(workspacePath) {
+    const detected = [];
+    for (const harness of HarnessConfig.getSupportedHarnesses()) {
+      const matched = (harness.markers || []).filter((marker) => {
+        try {
+          return existsSync(join(workspacePath, marker));
+        } catch {
+          return false;
+        }
+      });
+      if (matched.length > 0) {
+        detected.push({ id: harness.id, label: harness.label, matched });
+      }
+    }
+    return detected;
+  }
+
+  /**
+   * Install (or merge) the VectorForce entry for one canonical harness id.
+   * @returns {string|null} primary config file path, or null for unknown ids
+   */
+  static installHarness(workspacePath, id) {
+    switch (id) {
+      case 'antigravity': return HarnessConfig.installAntigravity(workspacePath);
+      case 'command-code': return HarnessConfig.installCommandCode(workspacePath);
+      case 'muse': return HarnessConfig.installMuseCode(workspacePath);
+      case 'codex': return HarnessConfig.installCodex(workspacePath);
+      case 'cursor': return HarnessConfig.installCursor(workspacePath);
+      case 'windsurf': return HarnessConfig.installWindsurf(workspacePath);
+      case 'copilot': return HarnessConfig.installCopilot(workspacePath);
+      case 'kiro': return HarnessConfig.installKiro(workspacePath);
+      default: return null;
+    }
+  }
+
+  /**
+   * Remove the VectorForce entry for one canonical harness id.
+   */
+  static uninstallHarness(workspacePath, id) {
+    switch (id) {
+      case 'antigravity': return HarnessConfig.uninstallAntigravity(workspacePath);
+      case 'command-code': return HarnessConfig.uninstallCommandCode(workspacePath);
+      case 'muse': return HarnessConfig.uninstallMuseCode(workspacePath);
+      case 'codex': return HarnessConfig.uninstallCodex(workspacePath);
+      case 'cursor': return HarnessConfig.uninstallCursor(workspacePath);
+      case 'windsurf': return HarnessConfig.uninstallWindsurf(workspacePath);
+      case 'copilot': return HarnessConfig.uninstallCopilot(workspacePath);
+      case 'kiro': return HarnessConfig.uninstallKiro(workspacePath);
+      default: return false;
+    }
+  }
+
+  /**
+   * Whether the workspace currently carries a VectorForce entry the harness will read.
+   */
+  static isHarnessConfigured(workspacePath, id) {
+    const readJson = (relPath) => {
+      try {
+        const full = join(workspacePath, relPath);
+        if (!existsSync(full)) return null;
+        return JSON.parse(readFileSync(full, 'utf8'));
+      } catch {
+        return null;
+      }
+    };
+    const hasEntry = (config) => Boolean(config?.mcpServers?.vectorforce);
+    switch (id) {
+      case 'antigravity':
+        return hasEntry(readJson(join('.agents', 'mcp_config.json')));
+      case 'command-code':
+        return hasEntry(readJson('.mcp.json')) || hasEntry(readJson('commandcode.json'));
+      case 'muse':
+        return hasEntry(readJson(join('.muse', 'mcp_config.json')))
+          || hasEntry(readJson('musecode.json'))
+          || HarnessConfig._isMuseGlobalConfigured(workspacePath);
+      case 'codex': {
+        try {
+          const tomlPath = join(workspacePath, '.codex', 'config.toml');
+          if (existsSync(tomlPath) && readFileSync(tomlPath, 'utf8').includes('[mcp_servers.vectorforce]')) {
+            return true;
+          }
+        } catch {}
+        return hasEntry(readJson('codex.json'));
+      }
+      case 'cursor':
+        return hasEntry(readJson(join('.cursor', 'mcp.json')));
+      case 'windsurf':
+        return hasEntry(readJson(join('.windsurf', 'mcp_config.json')));
+      case 'copilot': {
+        const config = readJson(join('.vscode', 'mcp.json'));
+        return Boolean(config?.servers?.vectorforce || config?.mcpServers?.vectorforce);
+      }
+      case 'kiro':
+        return hasEntry(readJson(join('.kiro', 'settings', 'mcp.json')))
+          || hasEntry(readJson(join('.kiro', 'mcp.json')))
+          || hasEntry(readJson('kiro.json'));
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Whether the global Muse Code settings already register VectorForce.
+   * Temp workspaces never consult global state (tests stay hermetic).
+   */
+  static _isMuseGlobalConfigured(workspacePath) {
+    if (isTempWorkspace(workspacePath)) return false;
+    try {
+      const settingsPath = join(homedir(), '.config', 'muse', 'settings.json');
+      if (!existsSync(settingsPath)) return false;
+      const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      return Boolean(settings?.mcpServers?.vectorforce);
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -27,7 +197,8 @@ export class HarnessConfig {
    */
   static getAntigravityServerEntry() {
     return {
-      command: 'node',
+      type: 'stdio',
+      command: HarnessConfig.getNodeCommand(),
       args: [HarnessConfig.getBinPath(), 'mcp']
     };
   }
@@ -81,9 +252,12 @@ export class HarnessConfig {
 
     if (!isTempWorkspace(workspacePath)) {
       try {
-        const globalAgyDir = join(homedir(), '.gemini', 'antigravity');
-        if (existsSync(globalAgyDir)) {
-          const globalMcpPath = join(globalAgyDir, 'mcp_config.json');
+        const globalCandidates = [
+          join(homedir(), '.gemini', 'config', 'mcp_config.json'),
+          join(homedir(), '.gemini', 'antigravity', 'mcp_config.json')
+        ];
+        const globalMcpPath = globalCandidates.find((candidate) => existsSync(dirname(candidate)));
+        if (globalMcpPath) {
           let globalConfig = {};
           if (existsSync(globalMcpPath)) {
             try {
@@ -95,7 +269,8 @@ export class HarnessConfig {
           globalConfig.mcpServers = {
             ...(globalConfig.mcpServers || {}),
             vectorforce: {
-              command: 'node',
+              type: 'stdio',
+              command: HarnessConfig.getNodeCommand(),
               args: [HarnessConfig.getBinPath(), 'mcp', '--workspace', workspacePath],
               env: {
                 VF_WORKSPACE: workspacePath,
@@ -141,7 +316,7 @@ export class HarnessConfig {
   static getCommandCodeServerEntry() {
     return {
       type: 'stdio',
-      command: 'node',
+      command: HarnessConfig.getNodeCommand(),
       args: [HarnessConfig.getBinPath(), 'mcp']
     };
   }
@@ -179,12 +354,19 @@ export class HarnessConfig {
       }
     }
 
+    const mcpServers = { ...(mcpCurrent?.mcpServers || {}) };
+    for (const [name, server] of Object.entries(mcpServers)) {
+      if (server && typeof server === 'object' && server.serverUrl && !server.url) {
+        server.url = server.serverUrl;
+        delete server.serverUrl;
+        if (!server.type) server.type = 'sse';
+      }
+    }
+    mcpServers.vectorforce = HarnessConfig.getCommandCodeServerEntry();
+
     const mcpMerged = {
       ...mcpCurrent,
-      mcpServers: {
-        ...(mcpCurrent?.mcpServers || {}),
-        vectorforce: HarnessConfig.getCommandCodeServerEntry()
-      }
+      mcpServers
     };
 
     const cliCommand = `cmd mcp add --transport stdio vectorforce -- node ${HarnessConfig.getBinPath()} mcp`;
@@ -251,7 +433,8 @@ export class HarnessConfig {
    */
   static getMuseCodeServerEntry() {
     return {
-      command: 'node',
+      type: 'stdio',
+      command: HarnessConfig.getNodeCommand(),
       args: [HarnessConfig.getBinPath(), 'mcp'],
       env: {
         VF_HARNESS: 'muse-code'
@@ -295,6 +478,42 @@ export class HarnessConfig {
   }
 
   /**
+   * Merge the VectorForce entry into global Muse Code settings (pure, no I/O).
+   * Muse Code reads MCP servers from the camelCase `mcpServers` block of the
+   * user settings file. A stale snake_case `mcp_servers.vectorforce` entry
+   * (written by older VectorForce releases) is migrated, never duplicated.
+   * The global entry carries no workspace pin, so one entry serves every
+   * project: the server resolves its workspace from its launch directory.
+   */
+  static _mergeMuseGlobalSettings(settings) {
+    const merged = { ...(settings || {}) };
+    if (merged.schema_version === undefined) {
+      merged.schema_version = 1;
+    }
+    const servers = { ...(merged.mcpServers || {}) };
+    servers.vectorforce = {
+      mode: 'optional',
+      transport: 'stdio',
+      command: HarnessConfig.getNodeCommand(),
+      args: [HarnessConfig.getBinPath(), 'mcp'],
+      env: {
+        VF_HARNESS: 'muse-code'
+      }
+    };
+    merged.mcpServers = servers;
+    if (merged.mcp_servers?.vectorforce) {
+      const remaining = { ...merged.mcp_servers };
+      delete remaining.vectorforce;
+      if (Object.keys(remaining).length === 0) {
+        delete merged.mcp_servers;
+      } else {
+        merged.mcp_servers = remaining;
+      }
+    }
+    return merged;
+  }
+
+  /**
    * Install Muse Code MCP configuration reversibly.
    * @param {string} workspacePath
    */
@@ -309,25 +528,28 @@ export class HarnessConfig {
 
     if (!isTempWorkspace(workspacePath)) {
       try {
-        const globalMuseDir = join(homedir(), '.config', 'muse');
-        const globalSettingsPath = join(globalMuseDir, 'settings.json');
-        if (existsSync(globalSettingsPath)) {
-          const settings = JSON.parse(readFileSync(globalSettingsPath, 'utf8'));
-          settings.mcp_servers = {
-            ...(settings.mcp_servers || {}),
-            vectorforce: {
-              transport: 'stdio',
-              command: 'node',
-              args: [HarnessConfig.getBinPath(), 'mcp'],
-              env: {
-                VF_HARNESS: 'muse-code',
-                VF_WORKSPACE: workspacePath
-              },
-              mode: 'optional'
+        const globalCandidates = [
+          join(homedir(), '.config', 'muse', 'settings.json'),
+          ...(process.platform === 'win32' ? [
+            join(process.env.APPDATA || join(homedir(), 'AppData', 'Roaming'), 'muse', 'settings.json'),
+            join(homedir(), '.muse', 'settings.json')
+          ] : [])
+        ];
+        for (const globalSettingsPath of globalCandidates) {
+          const globalMuseDir = dirname(globalSettingsPath);
+          if (globalSettingsPath.includes('.config') || existsSync(globalMuseDir)) {
+            mkdirSync(globalMuseDir, { recursive: true });
+            let settings = {};
+            if (existsSync(globalSettingsPath)) {
+              try {
+                settings = JSON.parse(readFileSync(globalSettingsPath, 'utf8'));
+              } catch {
+                settings = {};
+              }
             }
-          };
-          delete settings.mcpServers;
-          writeFileSync(globalSettingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+            settings = HarnessConfig._mergeMuseGlobalSettings(settings);
+            writeFileSync(globalSettingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+          }
         }
       } catch {}
     }
@@ -368,12 +590,26 @@ export class HarnessConfig {
 
     if (!isTempWorkspace(workspacePath)) {
       try {
-        const globalSettingsPath = join(homedir(), '.config', 'muse', 'settings.json');
-        if (existsSync(globalSettingsPath)) {
-          const settings = JSON.parse(readFileSync(globalSettingsPath, 'utf8'));
-          if (settings?.mcp_servers?.vectorforce) {
-            delete settings.mcp_servers.vectorforce;
-            writeFileSync(globalSettingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+        const globalCandidates = [
+          join(homedir(), '.config', 'muse', 'settings.json'),
+          ...(process.platform === 'win32' ? [
+            join(process.env.APPDATA || join(homedir(), 'AppData', 'Roaming'), 'muse', 'settings.json'),
+            join(homedir(), '.muse', 'settings.json')
+          ] : [])
+        ];
+        for (const globalSettingsPath of globalCandidates) {
+          if (existsSync(globalSettingsPath)) {
+            const settings = JSON.parse(readFileSync(globalSettingsPath, 'utf8'));
+            let changed = false;
+            for (const key of ['mcpServers', 'mcp_servers']) {
+              if (settings?.[key]?.vectorforce) {
+                delete settings[key].vectorforce;
+                changed = true;
+              }
+            }
+            if (changed) {
+              writeFileSync(globalSettingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+            }
           }
         }
       } catch {}
@@ -387,7 +623,8 @@ export class HarnessConfig {
    */
   static getCodexServerEntry() {
     return {
-      command: 'node',
+      type: 'stdio',
+      command: HarnessConfig.getNodeCommand(),
       args: [HarnessConfig.getBinPath(), 'mcp'],
       env: {
         VF_HARNESS: 'codex'
@@ -401,8 +638,9 @@ export class HarnessConfig {
    * @returns {string} merged TOML
    */
   static _mergeCodexToml(existingToml) {
-    const binPath = HarnessConfig.getBinPath().replace(/\\/g, '\\\\');
-    const serverBlock = `[mcp_servers.vectorforce]\ncommand = "node"\nargs = ["${binPath}", "mcp"]\n[mcp_servers.vectorforce.env]\nVF_HARNESS = "codex"\n`;
+    const nodeCommand = HarnessConfig._tomlString(HarnessConfig.getNodeCommand());
+    const binPath = HarnessConfig._tomlString(HarnessConfig.getBinPath());
+    const serverBlock = `[mcp_servers.vectorforce]\ncommand = ${nodeCommand}\nargs = [${binPath}, "mcp"]\n[mcp_servers.vectorforce.env]\nVF_HARNESS = "codex"\n`;
 
     if (!existingToml || !existingToml.trim()) {
       return serverBlock;
@@ -553,7 +791,8 @@ export class HarnessConfig {
    */
   static getCursorServerEntry() {
     return {
-      command: 'node',
+      type: 'stdio',
+      command: HarnessConfig.getNodeCommand(),
       args: [HarnessConfig.getBinPath(), 'mcp'],
       env: {
         VF_HARNESS: 'cursor'
@@ -630,7 +869,8 @@ export class HarnessConfig {
           globalConfig.mcpServers = {
             ...(globalConfig.mcpServers || {}),
             vectorforce: {
-              command: 'node',
+              type: 'stdio',
+              command: HarnessConfig.getNodeCommand(),
               args: [HarnessConfig.getBinPath(), 'mcp', '--workspace', workspacePath],
               env: {
                 VF_WORKSPACE: workspacePath,
@@ -676,7 +916,8 @@ export class HarnessConfig {
    */
   static getWindsurfServerEntry() {
     return {
-      command: 'node',
+      type: 'stdio',
+      command: HarnessConfig.getNodeCommand(),
       args: [HarnessConfig.getBinPath(), 'mcp'],
       env: {
         VF_HARNESS: 'windsurf'
@@ -753,7 +994,8 @@ export class HarnessConfig {
           globalConfig.mcpServers = {
             ...(globalConfig.mcpServers || {}),
             vectorforce: {
-              command: 'node',
+              type: 'stdio',
+              command: HarnessConfig.getNodeCommand(),
               args: [HarnessConfig.getBinPath(), 'mcp', '--workspace', workspacePath],
               env: {
                 VF_WORKSPACE: workspacePath,
@@ -799,7 +1041,8 @@ export class HarnessConfig {
    */
   static getCopilotServerEntry() {
     return {
-      command: 'node',
+      type: 'stdio',
+      command: HarnessConfig.getNodeCommand(),
       args: [HarnessConfig.getBinPath(), 'mcp'],
       env: {
         VF_HARNESS: 'copilot'
@@ -822,18 +1065,31 @@ export class HarnessConfig {
         current = {};
       }
     }
+    // VS Code reads only the top-level `servers` key; migrate any legacy
+    // `mcpServers.vectorforce` entry this tool wrote previously.
+    const migratedLegacy = Boolean(current?.mcpServers?.vectorforce);
     const mergedContent = {
       ...(current || {}),
-      mcpServers: {
-        ...(current?.mcpServers || {}),
+      servers: {
+        ...(current?.servers || {}),
         vectorforce: HarnessConfig.getCopilotServerEntry()
       }
     };
+    if (mergedContent.mcpServers?.vectorforce) {
+      const remaining = { ...mergedContent.mcpServers };
+      delete remaining.vectorforce;
+      if (Object.keys(remaining).length === 0) {
+        delete mergedContent.mcpServers;
+      } else {
+        mergedContent.mcpServers = remaining;
+      }
+    }
     return {
       filePath,
       exists: existsSync(filePath),
       currentContent: current,
-      mergedContent
+      mergedContent,
+      migratedLegacy
     };
   }
 
@@ -878,10 +1134,14 @@ export class HarnessConfig {
     if (existsSync(filePath)) {
       try {
         const config = JSON.parse(readFileSync(filePath, 'utf8'));
-        if (config?.mcpServers?.vectorforce) {
-          delete config.mcpServers.vectorforce;
+        for (const key of ['servers', 'mcpServers']) {
+          if (config?.[key]?.vectorforce) {
+            delete config[key].vectorforce;
+            removed = true;
+          }
+        }
+        if (removed) {
           writeFileSync(filePath, JSON.stringify(config, null, 2) + '\n', 'utf8');
-          removed = true;
         }
       } catch {}
     }
@@ -897,7 +1157,8 @@ export class HarnessConfig {
    */
   static getKiroServerEntry() {
     return {
-      command: 'node',
+      type: 'stdio',
+      command: HarnessConfig.getNodeCommand(),
       args: [HarnessConfig.getBinPath(), 'mcp'],
       env: {
         VF_HARNESS: 'kiro'
@@ -910,9 +1171,10 @@ export class HarnessConfig {
    * @param {string} workspacePath
    */
   static previewKiro(workspacePath) {
-    const dir = join(workspacePath, '.kiro');
+    const dir = join(workspacePath, '.kiro', 'settings');
     const filePath = join(dir, 'mcp.json');
     const kiroJsonPath = join(workspacePath, 'kiro.json');
+    const legacyPath = join(workspacePath, '.kiro', 'mcp.json');
 
     let current = null;
     if (existsSync(filePath)) {
@@ -949,6 +1211,7 @@ export class HarnessConfig {
     return {
       filePath,
       kiroJsonPath,
+      legacyPath,
       exists: existsSync(filePath) || existsSync(kiroJsonPath),
       currentContent: current,
       mergedContent,
@@ -962,19 +1225,34 @@ export class HarnessConfig {
    * @returns {string} filePath
    */
   static installKiro(workspacePath) {
-    const { filePath, kiroJsonPath, mergedContent, mergedKiroJson } = HarnessConfig.previewKiro(workspacePath);
-    const dir = join(workspacePath, '.kiro');
+    const { filePath, kiroJsonPath, legacyPath, mergedContent, mergedKiroJson } = HarnessConfig.previewKiro(workspacePath);
+    const dir = join(workspacePath, '.kiro', 'settings');
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true, mode: 0o755 });
     }
     writeFileSync(filePath, JSON.stringify(mergedContent, null, 2) + '\n', 'utf8');
     writeFileSync(kiroJsonPath, JSON.stringify(mergedKiroJson, null, 2) + '\n', 'utf8');
 
-    // Create .kiro/rules.md if missing
-    const rulesPath = join(dir, 'rules.md');
-    if (!existsSync(rulesPath)) {
+    // Migrate the legacy .kiro/mcp.json entry (Kiro only reads .kiro/settings/mcp.json).
+    if (legacyPath && existsSync(legacyPath)) {
+      try {
+        const legacy = JSON.parse(readFileSync(legacyPath, 'utf8'));
+        if (legacy?.mcpServers?.vectorforce) {
+          delete legacy.mcpServers.vectorforce;
+          writeFileSync(legacyPath, JSON.stringify(legacy, null, 2) + '\n', 'utf8');
+        }
+      } catch {}
+    }
+
+    // Create the Kiro steering file if missing.
+    const steeringDir = join(workspacePath, '.kiro', 'steering');
+    if (!existsSync(steeringDir)) {
+      mkdirSync(steeringDir, { recursive: true, mode: 0o755 });
+    }
+    const steeringPath = join(steeringDir, 'vectorforce.md');
+    if (!existsSync(steeringPath)) {
       writeFileSync(
-        rulesPath,
+        steeringPath,
         `# VectorForce Agent Steering (Kiro IDE)\n\nThis workspace uses VectorForce for architectural continuity and drift prevention.\n- Use VectorForce MCP tools: 'list_tasks', 'check_workspace_drift', 'get_resume_briefing', 'save_checkpoint'.\n- Strictly adhere to invariant constraints and architectural decisions.\n`,
         'utf8'
       );
@@ -989,27 +1267,20 @@ export class HarnessConfig {
    * @returns {boolean} whether removed
    */
   static uninstallKiro(workspacePath) {
-    const filePath = join(workspacePath, '.kiro', 'mcp.json');
-    const kiroJsonPath = join(workspacePath, 'kiro.json');
+    const candidates = [
+      join(workspacePath, '.kiro', 'settings', 'mcp.json'),
+      join(workspacePath, '.kiro', 'mcp.json'),
+      join(workspacePath, 'kiro.json')
+    ];
     let removed = false;
 
-    if (existsSync(filePath)) {
+    for (const candidate of candidates) {
+      if (!existsSync(candidate)) continue;
       try {
-        const config = JSON.parse(readFileSync(filePath, 'utf8'));
+        const config = JSON.parse(readFileSync(candidate, 'utf8'));
         if (config?.mcpServers?.vectorforce) {
           delete config.mcpServers.vectorforce;
-          writeFileSync(filePath, JSON.stringify(config, null, 2) + '\n', 'utf8');
-          removed = true;
-        }
-      } catch {}
-    }
-
-    if (existsSync(kiroJsonPath)) {
-      try {
-        const config = JSON.parse(readFileSync(kiroJsonPath, 'utf8'));
-        if (config?.mcpServers?.vectorforce) {
-          delete config.mcpServers.vectorforce;
-          writeFileSync(kiroJsonPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+          writeFileSync(candidate, JSON.stringify(config, null, 2) + '\n', 'utf8');
           removed = true;
         }
       } catch {}

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- Cross-platform MCP availability: generated harness configs now use the absolute Node.js runtime (`process.execPath`) with `"type": "stdio"` instead of bare `node`, so GUI-launched clients on Windows, macOS, and Linux can spawn `vf mcp` even when `node` is not on their PATH.
+- MCP protocol compatibility: the stdio server negotiates `protocolVersion` (`2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`), reports the package version, answers `resources/list`, `resources/templates/list`, `prompts/list`, and JSON-RPC batches, and keeps `stdout` reserved for JSON-RPC in `vf mcp` mode.
+- VS Code / Copilot: `.vscode/mcp.json` is now written under the top-level `servers` key (the only shape VS Code reads); legacy `mcpServers.vectorforce` entries are migrated on install and removed on uninstall.
+- Kiro IDE: workspace config is now written to `.kiro/settings/mcp.json` (the path Kiro reads) with steering in `.kiro/steering/vectorforce.md`; the legacy `.kiro/mcp.json` entry is migrated.
+- Meta Muse: `installMuseCode` now always ensures the global `~/.config/muse/settings.json` entry under the `mcpServers` key (the block Muse Code actually reads; a stale `mcp_servers.vectorforce` entry is migrated) with no workspace pin so one entry serves every project, and no longer deletes unrelated user keys.
+- Antigravity: global config prefers `~/.gemini/config/mcp_config.json` with fallback to `~/.gemini/antigravity/mcp_config.json`.
+- Codex TOML now embeds quoted absolute paths for both the Node runtime and `bin/vf.js`.
+
+### Changed
+- `vf init` no longer creates every harness config at once: it auto-detects harnesses already in use (marker files/dirs), installs only those, and otherwise creates none while printing the exact follow-up commands. Override with `vf init --harness <id[,...]|all|none>` or `vf init --all`.
+- Added `vf config list` showing supported harnesses with detected/configured status; `vf config install`/`uninstall` reject unknown harness names with that hint.
+- `vf doctor`, `vf status`, and `vf config doctor` now verify the VectorForce entry exists instead of only the file.
+
 ## [0.3.2] - 2026-11-01
 
 ### Added

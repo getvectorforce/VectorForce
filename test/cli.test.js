@@ -12,7 +12,7 @@ test('Milestone M1: End-to-end CLI workflow', () => {
 
   const env = {
     ...process.env,
-    VF_DB_PATH: dbPath
+    VF_DB_PATH: dbPath, VF_WORKSPACE: tempDir
   };
 
   const runVf = (args) => {

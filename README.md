@@ -27,6 +27,85 @@ VectorForce provides an immutable, cryptographic context layer that tracks:
 
 ---
 
+## Architecture & System Topology
+
+VectorForce is engineered with a strict **Local-First & Zero Runtime Dependency** design. It operates entirely through Node.js built-ins (`node:sqlite`, `node:crypto`, `node:http`, `node:fs`) and integrates seamlessly across local IDEs, multi-agent MCP bridges, and zero-knowledge cloud sync.
+
+```mermaid
+flowchart TD
+    subgraph AI_Harnesses["AI Coding Agent Ecosystem (MCP Protocol)"]
+        A1["⚡ Google Antigravity"]
+        A2["🦙 Meta Muse"]
+        A3["⌘ Claude / Command Code"]
+        A4["◈ OpenAI Codex"]
+        A5["🖱️ Cursor IDE"]
+        A6["🌊 Windsurf Cascade"]
+        A7["🐙 GitHub Copilot"]
+        A8["⚡ Kiro IDE"]
+    end
+
+    subgraph VectorForce_Core["VectorForce Core Engine (Zero Runtime Dependencies)"]
+        direction TB
+        MCP["MCP Server & JSON-RPC Bridge\n(src/mcp/mcp-server.js • stdio)"]
+        CLI["CLI Control Interface\n(bin/vf.js • init, status, drift, resume)"]
+        
+        AUTH["Zero-Leak Policy Authorizer\n(src/policy/authorizer.js • Symlink & Containment Guard)"]
+        
+        subgraph Operations["Operations & Synthesis Services"]
+            CHK["Checkpoint Service\n(Claims vs Evidence Fencing)"]
+            BRF["Briefing & Drift Service\n(Git HEAD & SHA-256 Hash Matching)"]
+            RSN["AI Reasoning Service\n(Meta Muse • Fireworks • Llama 3.3)"]
+            HDF["Handoff Service\n(HMAC-SHA256 Manifest Export/Import)"]
+        end
+
+        subgraph Providers["Zero-Dep Workspace Observers"]
+            GIT["Git Provider\n(Branch, Commit SHA, Diff, Dirty Tree)"]
+            DOC["Document Provider\n(Allowlisted Spec Reader & SHA-256 Hashes)"]
+            AST["Code Index Provider\n(AST Symbols & Import Dependency Graph)"]
+        end
+
+        DB[("Local SQLite WAL Store\n(.vectorforce/vectorforce.db\nnode:sqlite WAL mode)")]
+    end
+
+    subgraph Studio_UI["Local VectorForce Studio (Web UI)"]
+        WEB["Studio HTTP Server (127.0.0.1:3210)\nReact + Vite + Tailwind + XYFlow"]
+    end
+
+    subgraph Cloud_Layer["VectorForce Cloud (Modal.com / E2EE Sync)"]
+        REMOTE["Zero-Knowledge Wire & Hub\nX25519 ECDH + AES-256-GCM + Ed25519 Signature\n(Multi-Project Hub • PM Interpreter Portal)"]
+    end
+
+    %% Wiring
+    A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 <-->|"stdio JSON-RPC 2.0"| MCP
+    CLI --> AUTH
+    MCP --> AUTH
+    AUTH --> Operations
+    Operations <--> Providers
+    Operations <--> DB
+    DB <--> WEB
+    Operations <-->|"vf push / vf pull\n(Encrypted Ciphertext)"| REMOTE
+```
+
+---
+
+## Tech Stack Overview
+
+VectorForce adheres to strict architectural purity, ensuring rock-solid stability, privacy, and speed without bloated dependency chains.
+
+| Layer | Technology | Rationale / Key Capabilities |
+| :--- | :--- | :--- |
+| **Runtime & Core** | **Node.js (>= 22.5.0 ESM)** | Pure ES Modules, fast startup, native cross-platform support (macOS, Linux, Windows). |
+| **Backend Dependencies** | **Zero External Runtime Dependencies** | Powered 100% by Node.js built-ins: `node:sqlite`, `node:crypto`, `node:http`, `node:fs`, `node:child_process`, `node:os`. |
+| **Storage Engine** | **`node:sqlite` (WAL Mode)** | Local-first, zero-configuration database (`.vectorforce/vectorforce.db`) with Write-Ahead Logging for atomic concurrent reads/writes. |
+| **Cryptographic Security** | **`node:crypto` (HMAC-SHA256, AES-256-GCM, X25519, Ed25519)** | Tamper-evident handoffs, verifiable file digests, and end-to-end zero-knowledge multi-machine sync. |
+| **Protocol Integration** | **Model Context Protocol (MCP)** | JSON-RPC 2.0 over standard I/O (`stdio`), 9 deterministic tools, and auto-configuration for 8+ AI harnesses. |
+| **AI Reasoning Layer** | **Meta Muse & Llama 3.3** | Native adapters for **Meta Muse (`muse-spark-1.3`)**, **Meta Muse Spark Open** (Fireworks AI / OpenRouter), Local **Ollama**, **OpenAI**, and **Anthropic** with graceful offline briefing fallback. |
+| **AST & Code Indexer** | **Custom Zero-Dependency Regex/Tokenizer Indexer** | Extracts symbols (classes, functions, interfaces), imports, and module dependency graphs without heavy external parser bloat. |
+| **Local Studio Frontend** | **React 18 + Vite + Tailwind CSS + XYFlow** | Interactive architecture control center, live blast radius inspector, Claims vs Evidence timeline, and memory console. |
+| **Cloud Remote Sync** | **Modal.com Serverless Container (Debian + Node 22)** | Zero-Knowledge E2EE relay hub, scale-to-zero serverless deployment, PM Interpreter, and Multi-Project switcher. |
+
+---
+
 ## VectorForce Studio (Web UI)
 
 VectorForce includes a local-first engineering control center:

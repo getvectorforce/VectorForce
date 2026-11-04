@@ -2,12 +2,34 @@
 
 > **Git for AI Context** — A local-first, privacy-preserving engineering memory platform and architecture control center for AI coding agents.
 
+<p align="center">
+  <img src="assets/vectorforce-banner.jpg" alt="VectorForce — Shared Context. Collective Intelligence." width="100%" />
+</p>
+
 [![Website](https://img.shields.io/badge/website-getvectorforce.github.io-6366f1.svg)](https://getvectorforce.github.io/)
-[![Tests](https://img.shields.io/badge/tests-75%20passing%20(Linux%20%7C%20macOS%20%7C%20Windows)-brightgreen.svg)](https://github.com/getvectorforce/VectorForce/actions)
+[![Demo Video](https://img.shields.io/badge/demo-watch%20video%20(2m%2021s)-red.svg)](https://getvectorforce.github.io/#demo-video)
+[![Tests](https://img.shields.io/badge/tests-94%20passing%20(Linux%20%7C%20macOS%20%7C%20Windows)-brightgreen.svg)](https://github.com/getvectorforce/VectorForce/actions)
 [![Dependencies](https://img.shields.io/badge/backend%20runtime%20deps-zero-blue.svg)](#architecture-invariants)
 [![Storage](https://img.shields.io/badge/storage-local%20SQLite%20WAL-orange.svg)](#local-first-architecture)
 [![Harnesses](https://img.shields.io/badge/harnesses-Antigravity%20%7C%20Claude%20Code%20%7C%20Command%20Code%20%7C%20Codex%20%7C%20Muse-purple.svg)](#model-context-protocol-mcp)
 [![Hackathon](https://img.shields.io/badge/Meta%20Muse%20Hackathon-2026-blueviolet.svg)](#5-reason-over-context-ai-engineering-memory)
+
+---
+
+## 🎬 Product Demo Video (2m 21s)
+
+> **Watch how VectorForce eliminates Coding Agent Amnesia across 8 AI harnesses:**
+
+[![VectorForce Demo Video](https://img.shields.io/badge/Watch%20Demo%20Video-2m%2021s-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://getvectorforce.github.io/#demo-video)
+[![Interactive Demo](https://img.shields.io/badge/Interactive-Watch%20on%20Official%20Site-6366f1?style=for-the-badge&logo=googlechrome&logoColor=white)](https://getvectorforce.github.io/#demo-video)
+
+| Timestamp | Chapter | Milestone Demonstrated |
+| :--- | :--- | :--- |
+| **00:00** | **1. The Problem** | Coding Agent Amnesia: Vanishing ADRs across Antigravity, Cursor & Claude |
+| **00:26** | **2. Zero-Dep Core** | `vf config install all` auto-configures 8 AI harnesses via MCP |
+| **00:55** | **3. Claims vs Evidence** | Cryptographic fence: Git SHAs + doc digests vs unverified model claims |
+| **01:25** | **4. Studio UI & Swarm** | Interactive architecture topology on port 3210 & 5-agent banking swarm |
+| **01:55** | **5. AI Reasoning & Wrap-Up** | Meta Muse & Llama 3.3 synthesis layer + npm quickstart |
 
 ---
 

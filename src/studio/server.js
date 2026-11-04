@@ -21,7 +21,8 @@ export function createStudioServer({
   workspacePath = process.cwd(),
   port = 3210
 } = {}) {
-  const store = new SqliteStore(dbPath);
+  const resolvedDbPath = dbPath || join(workspacePath, '.vectorforce', 'vectorforce.db');
+  const store = new SqliteStore(resolvedDbPath);
   const projectService = new ProjectService(store);
   const checkpointService = new CheckpointService(store, projectService);
   const briefingService = new BriefingService(store, projectService);

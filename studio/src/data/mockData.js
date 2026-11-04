@@ -1,5 +1,44 @@
 export const initialProjectData = {
   project: {
+    id: "",
+    name: "VectorForce Workspace",
+    tagline: "AI Engineering Memory for Coding Agents",
+    canonical_path: "",
+    created_at: new Date().toISOString()
+  },
+  ai: {
+    connected: false,
+    provider: "none",
+    model: "",
+    latency: "0ms",
+    contextWindow: "128k"
+  },
+  health: {
+    score: 100,
+    status: "Healthy",
+    driftDetected: false,
+    memoryIntegrity: "Verified",
+    harnessesConnected: []
+  },
+  stats: {
+    filesIndexed: 0,
+    symbolsIndexed: 0,
+    allowlistedDocs: 0,
+    checkpointsCount: 0,
+    decisionsCount: 0,
+    activeTasks: 0
+  },
+  tasks: [],
+  decisions: [],
+  constraints: [],
+  checkpoints: [],
+  modules: [],
+  connections: [],
+  team: []
+};
+
+export const mockProjectData = {
+  project: {
     id: "proj-c16f3afcb5712bc2",
     name: "VectorForce Studio",
     tagline: "AI Engineering Memory for Coding Agents",

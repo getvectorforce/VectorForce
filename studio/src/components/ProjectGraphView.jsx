@@ -35,21 +35,10 @@ export default function ProjectGraphView({ projectData, onTriggerReasoning }) {
     return matchesCategory && matchesSearch;
   });
 
-  // Calculate connection lines between nodes from live dependency graph or fallback
-  const connections = Array.isArray(projectData?.connections) && projectData.connections.length > 0
+  // Calculate connection lines between nodes from live dependency graph
+  const connections = Array.isArray(projectData?.connections)
     ? projectData.connections
-    : [
-        { from: 'mcp-bridge', to: 'context-store' },
-        { from: 'mcp-bridge', to: 'auth-service' },
-        { from: 'mcp-bridge', to: 'ai-reasoning' },
-        { from: 'auth-service', to: 'context-store' },
-        { from: 'ai-reasoning', to: 'code-index' },
-        { from: 'ai-reasoning', to: 'context-store' },
-        { from: 'ai-reasoning', to: 'briefing-engine' },
-        { from: 'code-index', to: 'context-store' },
-        { from: 'briefing-engine', to: 'context-store' },
-        { from: 'handoff-service', to: 'context-store' }
-      ];
+    : [];
 
   const canvasWidth = Math.max(1050, ...modules.map((m) => (m.x || 0) + 260));
   const canvasHeight = Math.max(700, ...modules.map((m) => (m.y || 0) + 180));

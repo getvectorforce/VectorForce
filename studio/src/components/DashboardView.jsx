@@ -133,7 +133,11 @@ export default function DashboardView({
               Resume Your Engineering Context
             </h1>
             <p className="text-sm text-slate-300/90 leading-relaxed">
-              Last session recorded in task <span className="font-semibold text-indigo-300">{lastCp?.task_id}</span> by <span className="text-slate-200">{lastCp?.author}</span>. Zero cloud leaks, verified local SQLite state.
+              {lastCp ? (
+                <>Last session recorded in task <span className="font-semibold text-indigo-300">{lastCp?.task_id}</span> by <span className="text-slate-200">{lastCp?.author}</span>. Zero cloud leaks, verified local SQLite state.</>
+              ) : (
+                <>AI engineering memory online. Capture decisions, invariants, and provenance across Google Antigravity, Muse, Codex, and Claude Code.</>
+              )}
             </p>
           </div>
 
@@ -486,63 +490,73 @@ export default function DashboardView({
           </div>
 
           <div className="space-y-3">
-            {projectData?.checkpoints?.slice(0, 3).map((cp) => (
-              <div
-                key={cp.id}
-                onClick={() => onNavigateToTab('timeline')}
-                className="p-4 rounded-xl glass-panel glass-panel-hover border border-slate-800/80 space-y-2.5 cursor-pointer transition-all hover:border-indigo-500/50"
-                title="Click to inspect checkpoint in Timeline"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-bold text-indigo-400">{cp.id.slice(0, 8)}</span>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                        {cp.task_id}
-                      </span>
-                      {cp.drift && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-amber-400" />
-                          Drift
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-300 mt-1 font-medium leading-relaxed">
-                      {cp.summary}
-                    </p>
-                  </div>
-                  <span className="text-[11px] text-slate-500 shrink-0 font-medium">{cp.timestamp}</span>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/60 text-xs text-slate-400">
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1 text-[11px]">
-                      <GitCommit className="w-3.5 h-3.5 text-slate-500" />
-                      <span className="font-mono text-slate-300">{cp.commit}</span>
-                    </span>
-                    <span className="text-[11px] text-slate-500 truncate max-w-[200px]">
-                      By {cp.author}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {cp.decisions?.map((d) => (
-                      <span key={d} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                        {d}
-                      </span>
-                    ))}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onTriggerReasoning(`Review checkpoint ${cp.id.slice(0, 8)}`);
-                      }}
-                      className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 px-2 py-0.5 rounded hover:bg-indigo-500/10 transition-colors cursor-pointer"
-                    >
-                      Reason ▶
-                    </button>
-                  </div>
-                </div>
+            {!projectData?.checkpoints || projectData.checkpoints.length === 0 ? (
+              <div className="p-8 rounded-xl glass-panel border border-slate-800/80 text-center space-y-2">
+                <Clock className="w-6 h-6 text-slate-500 mx-auto" />
+                <p className="text-xs font-semibold text-slate-300">No Checkpoints Committed Yet</p>
+                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                  Run <code className="text-indigo-400 bg-slate-900 px-1.5 py-0.5 rounded font-mono">vf checkpoint</code> or click &quot;+ Commit Checkpoint&quot; above to capture your first provenance checkpoint.
+                </p>
               </div>
-            ))}
+            ) : (
+              projectData.checkpoints.slice(0, 3).map((cp) => (
+                <div
+                  key={cp.id}
+                  onClick={() => onNavigateToTab('timeline')}
+                  className="p-4 rounded-xl glass-panel glass-panel-hover border border-slate-800/80 space-y-2.5 cursor-pointer transition-all hover:border-indigo-500/50"
+                  title="Click to inspect checkpoint in Timeline"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono font-bold text-indigo-400">{cp.id.slice(0, 8)}</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                          {cp.task_id}
+                        </span>
+                        {cp.drift && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-amber-400" />
+                            Drift
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1 font-medium leading-relaxed">
+                        {cp.summary}
+                      </p>
+                    </div>
+                    <span className="text-[11px] text-slate-500 shrink-0 font-medium">{cp.timestamp}</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/60 text-xs text-slate-400">
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1 text-[11px]">
+                        <GitCommit className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="font-mono text-slate-300">{cp.commit}</span>
+                      </span>
+                      <span className="text-[11px] text-slate-500 truncate max-w-[200px]">
+                        By {cp.author}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {cp.decisions?.map((d) => (
+                        <span key={d} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                          {d}
+                        </span>
+                      ))}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTriggerReasoning(`Review checkpoint ${cp.id.slice(0, 8)}`);
+                        }}
+                        className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 px-2 py-0.5 rounded hover:bg-indigo-500/10 transition-colors cursor-pointer"
+                      >
+                        Reason ▶
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -557,34 +571,49 @@ export default function DashboardView({
               onClick={() => onNavigateToTab('memory')}
               className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
             >
-              All ({projectData?.decisions?.length})
+              All ({projectData?.decisions?.length || 0})
             </button>
           </div>
 
           <div className="space-y-3">
-            {projectData?.decisions?.slice(0, 3).map((d) => (
-              <div key={d.id} className="p-3.5 rounded-xl glass-panel-subtle border border-slate-800/80 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-indigo-300">{d.id}</span>
-                  <span className="text-[10px] font-mono text-slate-500">{d.taskId}</span>
-                </div>
-                <h3 className="text-xs font-bold text-slate-200">{d.title}</h3>
-                <p className="text-[11px] text-slate-400 leading-relaxed">{d.rationale}</p>
+            {!projectData?.decisions || projectData.decisions.length === 0 ? (
+              <div className="p-4 rounded-xl glass-panel border border-slate-800/80 text-center space-y-1.5">
+                <p className="text-xs font-semibold text-slate-300">No Decisions Recorded Yet</p>
+                <p className="text-[11px] text-slate-500">
+                  Decisions recorded via <code className="text-indigo-400 font-mono">--decision &lt;ID&gt;:&lt;Title&gt;:&lt;Rationale&gt;</code> will appear here.
+                </p>
               </div>
-            ))}
+            ) : (
+              projectData.decisions.slice(0, 3).map((d) => (
+                <div key={d.id} className="p-3.5 rounded-xl glass-panel-subtle border border-slate-800/80 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold text-indigo-300">{d.id}</span>
+                    <span className="text-[10px] font-mono text-slate-500">{d.taskId}</span>
+                  </div>
+                  <h3 className="text-xs font-bold text-slate-200">{d.title}</h3>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">{d.rationale}</p>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Invariant Constraints Box */}
-          <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold text-amber-300 uppercase tracking-wider">
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
               <span>Non-Negotiable Invariants</span>
             </div>
-            <ul className="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
-              {(projectData?.constraints || []).slice(0, 4).map((c, idx) => (
-                <li key={idx}>{c}</li>
-              ))}
-            </ul>
+            {!projectData?.constraints || projectData.constraints.length === 0 ? (
+              <p className="text-[11px] text-slate-500">
+                No active invariants. Enforce rules across coding agents via <code className="text-indigo-400 font-mono">--constraint &quot;...&quot;</code>.
+              </p>
+            ) : (
+              <ul className="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
+                {projectData.constraints.slice(0, 4).map((c, idx) => (
+                  <li key={idx}>{c}</li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </div>

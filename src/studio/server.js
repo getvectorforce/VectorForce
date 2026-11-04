@@ -237,25 +237,23 @@ export function createStudioServer({
           : checkpoints;
 
         // Dynamically cluster code files by architectural module
+        const resolveModId = (filePath) => {
+          if (filePath === 'src/index.js') return 'core';
+          if (filePath.startsWith('src/')) {
+            const parts = filePath.split('/');
+            return parts[1] || 'core';
+          }
+          if (filePath.startsWith('test/') || filePath.startsWith('tests/')) return 'tests';
+          if (filePath.startsWith('wiki/')) return 'wiki';
+          if (filePath.startsWith('studio/')) return 'studio-ui';
+          if (filePath.startsWith('bin/')) return 'cli';
+          const parts = filePath.split('/');
+          return parts.length > 1 ? parts[0] : 'root';
+        };
+
         const moduleMap = new Map();
         for (const file of codeIndex.files) {
-          const parts = file.path.split('/');
-          let modId = parts[0];
-          if (file.path === 'src/index.js') {
-            modId = 'core';
-          } else if (file.path.startsWith('src/')) {
-            modId = parts[1] || 'core';
-          } else if (file.path.startsWith('test/')) {
-            modId = 'tests';
-          } else if (file.path.startsWith('wiki/')) {
-            modId = 'wiki';
-          } else if (file.path.startsWith('studio/')) {
-            modId = 'studio-ui';
-          } else if (file.path.startsWith('bin/')) {
-            modId = 'cli';
-          } else {
-            modId = parts.length > 1 ? parts[0] : 'root';
-          }
+          const modId = resolveModId(file.path);
 
           if (!moduleMap.has(modId)) {
             const prettyNames = {
@@ -265,7 +263,7 @@ export function createStudioServer({
               'providers': 'AI LLM & AST Code Index',
               'mcp': 'Harness MCP Bridge',
               'studio': 'Studio API Server',
-              'core': 'Core Hashes & Errors',
+              'core': 'Core Engine & Foundation',
               'cli': 'Unified CLI Interface',
               'studio-ui': 'React Studio Frontend',
               'tests': 'Automated Test Suite',
@@ -278,14 +276,20 @@ export function createStudioServer({
               'controllers': 'Controllers',
               'routes': 'Router Layer',
               'services': 'Domain Services',
-              'utils': 'Utility Helpers'
+              'utils': 'Utility Helpers',
+              'agents': 'AI Autonomous Agents',
+              'rag': 'RAG & Vector Retrieval',
+              'swarm': 'Multi-Agent Swarm Orchestrator',
+              'tools': 'Agent Tools & Functions',
+              'chains': 'Cognitive Chains',
+              'prompts': 'System Prompts'
             };
             const capitalizedMod = modId.charAt(0).toUpperCase() + modId.slice(1);
             moduleMap.set(modId, {
               id: modId,
               name: prettyNames[modId] || capitalizedMod,
               category: (modId === 'policy' || modId === 'storage' || modId === 'auth' || modId === 'security') ? 'Security' :
-                        (modId === 'providers' || modId === 'ai' || modId === 'llm') ? 'AI / Copilot' :
+                        (modId === 'providers' || modId === 'ai' || modId === 'llm' || modId === 'agents' || modId === 'rag' || modId === 'swarm') ? 'AI / Copilot' :
                         (modId === 'mcp' || modId === 'api' || modId === 'routes') ? 'Integration' : 'Core',
               owner: project.name || 'Workspace',
               files: [],
@@ -306,10 +310,8 @@ export function createStudioServer({
 
         // Map codeIndex.edges to module dependencies
         for (const edge of codeIndex.edges) {
-          const fromParts = edge.from.split('/');
-          const toParts = edge.to.split('/');
-          const fromMod = fromParts[0] === 'src' ? (fromParts[1] || 'core') : fromParts[0];
-          const toMod = toParts[0] === 'src' ? (toParts[1] || 'core') : toParts[0];
+          const fromMod = resolveModId(edge.from);
+          const toMod = resolveModId(edge.to);
           if (fromMod !== toMod && moduleMap.has(fromMod) && moduleMap.has(toMod)) {
             moduleMap.get(fromMod).dependencies.add(toMod);
           }

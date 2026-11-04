@@ -18,26 +18,8 @@ export default function MemoryView({ projectData }) {
   const decisions = projectData?.decisions || [];
   const constraints = projectData?.constraints || [];
 
-  const rawSymbols = Array.isArray(projectData?.topSymbols) && projectData.topSymbols.length > 0
-    ? projectData.topSymbols
-    : [
-        { name: 'SqliteStore', type: 'Class', file: 'src/storage/sqlite-store.js' },
-        { name: 'ReasoningService', type: 'Class', file: 'src/operations/reasoning-service.js' },
-        { name: 'McpServer', type: 'Class', file: 'src/mcp/mcp-server.js' },
-        { name: 'HandoffService', type: 'Class', file: 'src/operations/handoff-service.js' },
-        { name: 'BriefingService', type: 'Class', file: 'src/operations/briefing-service.js' },
-        { name: 'CodeIndexProvider', type: 'Class', file: 'src/providers/code-index-provider.js' }
-      ];
-
-  const rawDocs = Array.isArray(projectData?.allowedDocsList) && projectData.allowedDocsList.length > 0
-    ? projectData.allowedDocsList
-    : (Array.isArray(projectData?.allowedDocuments) && projectData.allowedDocuments.length > 0
-        ? projectData.allowedDocuments.map((d) => ({ path: d, size: 'Tracked', hash: 'sha256...', status: 'Verified' }))
-        : [
-            { path: 'AGENTS.md', size: '2.1 kB', hash: 'cff46c35...', status: 'Verified' },
-            { path: 'docs/spec.md', size: '50 bytes', hash: 'd4382c45...', status: 'Tamper Flagged (Pilot)' },
-            { path: 'package.json', size: '942 bytes', hash: '8a3b129c...', status: 'Verified' }
-          ]);
+  const rawSymbols = Array.isArray(projectData?.topSymbols) ? projectData.topSymbols : [];
+  const rawDocs = Array.isArray(projectData?.allowedDocsList) ? projectData.allowedDocsList : [];
 
   const filteredDecisions = decisions.filter(
     (d) =>
@@ -120,32 +102,45 @@ export default function MemoryView({ projectData }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredDecisions.map((d) => (
-              <div
-                key={d.id}
-                className="p-5 rounded-2xl glass-panel glass-panel-hover border border-slate-800/80 space-y-2 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30">
-                      {d.id}
-                    </span>
-                    <span className="text-[11px] font-mono text-slate-500">{d.taskId}</span>
-                  </div>
-                  <h3 className="text-sm font-bold text-white mt-2">{d.title}</h3>
-                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">{d.rationale}</p>
-                </div>
-                <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Committed &amp; Verified</span>
-                  </span>
-                  <span>{d.timestamp?.slice(0, 10)}</span>
-                </div>
+          {filteredDecisions.length === 0 ? (
+            <div className="p-12 rounded-2xl glass-panel border border-slate-800/80 text-center space-y-3">
+              <Database className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="text-sm font-bold text-slate-300">No Architectural Decisions Found</p>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                No decisions recorded in this project yet. Commit architectural decisions using the MCP bridge or CLI:
+              </p>
+              <div className="inline-block bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono text-purple-300">
+                vf checkpoint --task &lt;id&gt; --decision &quot;DEC-01:Title:Rationale&quot;
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredDecisions.map((d) => (
+                <div
+                  key={d.id}
+                  className="p-5 rounded-2xl glass-panel glass-panel-hover border border-slate-800/80 space-y-2 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30">
+                        {d.id}
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-500">{d.taskId}</span>
+                    </div>
+                    <h3 className="text-sm font-bold text-white mt-2">{d.title}</h3>
+                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">{d.rationale}</p>
+                  </div>
+                  <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Committed &amp; Verified</span>
+                    </span>
+                    <span>{d.timestamp?.slice(0, 10)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -155,22 +150,35 @@ export default function MemoryView({ projectData }) {
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
             Non-Negotiable Invariants
           </span>
-          <div className="space-y-3">
-            {constraints.map((c, idx) => (
-              <div
-                key={idx}
-                className="p-4 rounded-xl glass-panel border border-amber-500/20 flex items-start gap-3 bg-amber-500/5"
-              >
-                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-bold text-slate-200">{c}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Enforced at every checkpoint across Google Antigravity and Command Code.
-                  </p>
-                </div>
+          {constraints.length === 0 ? (
+            <div className="p-12 rounded-2xl glass-panel border border-slate-800/80 text-center space-y-3">
+              <AlertTriangle className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="text-sm font-bold text-slate-300">No Non-Negotiable Invariants Set</p>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Invariants are strict constraints enforced across all connected harnesses (Google Antigravity, Claude Code, Cursor, Windsurf, Copilot, Codex, Muse).
+              </p>
+              <div className="inline-block bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono text-amber-300">
+                vf checkpoint --task &lt;id&gt; --constraint &quot;Inviolable security boundary&quot;
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {constraints.map((c, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 rounded-xl glass-panel border border-amber-500/20 flex items-start gap-3 bg-amber-500/5"
+                >
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-200">{c}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Enforced across Google Antigravity, Claude Code, Cursor, Windsurf, and Codex.
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -204,17 +212,21 @@ export default function MemoryView({ projectData }) {
             <p className="text-xs text-slate-400 leading-relaxed">
               Symbols are extracted deterministically without cloud scrapers or external language servers. Zero runtime dependencies.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
-              {filteredSymbols.map((s, idx) => (
-                <div key={`${s.name}-${idx}`} className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-indigo-300 font-mono truncate max-w-[180px]">{s.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">{s.type}</span>
+            {filteredSymbols.length === 0 ? (
+              <p className="text-xs text-slate-500 py-6 text-center">No symbols found matching filter.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
+                {filteredSymbols.map((s, idx) => (
+                  <div key={`${s.name}-${idx}`} className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-indigo-300 font-mono truncate max-w-[180px]">{s.name}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">{s.type}</span>
+                    </div>
+                    <p className="text-[11px] font-mono text-slate-500 truncate" title={s.file}>{s.file}</p>
                   </div>
-                  <p className="text-[11px] font-mono text-slate-500 truncate" title={s.file}>{s.file}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -246,27 +258,37 @@ export default function MemoryView({ projectData }) {
               </span>
               <span className="text-xs font-mono text-emerald-400 font-semibold">{filteredDocs.length} Tracked</span>
             </div>
-            <div className="space-y-2 pt-2">
-              {filteredDocs.map((doc) => (
-                <div key={doc.path} className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-slate-500" />
-                    <span className="font-mono text-slate-200 font-semibold">{doc.path}</span>
-                    <span className="text-[10px] text-slate-500">({doc.size})</span>
+            {filteredDocs.length === 0 ? (
+              <div className="py-8 text-center space-y-2">
+                <FileText className="w-6 h-6 text-slate-600 mx-auto" />
+                <p className="text-xs text-slate-400">No documents currently on the policy allowlist.</p>
+                <p className="text-[11px] text-slate-500">
+                  Allowlist files with <code className="text-emerald-400 font-mono">vf policy add &lt;file.md&gt;</code>
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 pt-2">
+                {filteredDocs.map((doc) => (
+                  <div key={doc.path} className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-slate-500" />
+                      <span className="font-mono text-slate-200 font-semibold">{doc.path}</span>
+                      <span className="text-[10px] text-slate-500">({doc.size})</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] font-mono text-slate-500">{doc.hash}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        (doc.status || '').includes('Missing') || (doc.status || '').includes('Tamper')
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
+                      }`}>
+                        {doc.status || 'Verified'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-mono text-slate-500">{doc.hash}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      (doc.status || '').includes('Missing') || (doc.status || '').includes('Tamper')
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
-                    }`}>
-                      {doc.status || 'Verified'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

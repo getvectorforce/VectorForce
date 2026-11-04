@@ -48,124 +48,137 @@ export default function TimelineView({ projectData, onTriggerReasoning, onNaviga
       </div>
 
       {/* Timeline River */}
-      <div className="relative pl-6 space-y-8 before:absolute before:left-2 before:top-3 before:bottom-3 before:w-0.5 before:bg-gradient-to-b before:from-indigo-500 before:via-purple-500 before:to-slate-800">
-        {checkpoints.map((cp, idx) => {
-          const isExpanded = expandedId === cp.id;
-          return (
-            <div key={cp.id} className="relative group">
-              {/* Timeline Dot */}
-              <div className="absolute -left-[30px] top-4 w-4 h-4 rounded-full bg-slate-900 border-2 border-indigo-500 group-hover:border-purple-400 group-hover:scale-125 transition-all glow-indigo flex items-center justify-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-              </div>
+      {checkpoints.length === 0 ? (
+        <div className="p-12 rounded-2xl glass-panel border border-slate-800 text-center space-y-3">
+          <History className="w-8 h-8 text-slate-600 mx-auto" />
+          <p className="text-sm font-bold text-slate-300">No Checkpoints in Provenance Timeline</p>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            This workspace has not committed any VectorForce checkpoints yet. When you save checkpoints via your AI coding agent or the CLI, each step is parent-linked into this cryptographic chain.
+          </p>
+          <div className="inline-block bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono text-indigo-300">
+            vf checkpoint --task &lt;task-id&gt; --summary &quot;Initial architecture checkpoint&quot;
+          </div>
+        </div>
+      ) : (
+        <div className="relative pl-6 space-y-8 before:absolute before:left-2 before:top-3 before:bottom-3 before:w-0.5 before:bg-gradient-to-b before:from-indigo-500 before:via-purple-500 before:to-slate-800">
+          {checkpoints.map((cp, idx) => {
+            const isExpanded = expandedId === cp.id;
+            return (
+              <div key={cp.id} className="relative group">
+                {/* Timeline Dot */}
+                <div className="absolute -left-[30px] top-4 w-4 h-4 rounded-full bg-slate-900 border-2 border-indigo-500 group-hover:border-purple-400 group-hover:scale-125 transition-all glow-indigo flex items-center justify-center">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                </div>
 
-              {/* Card Container */}
-              <div className="p-5 rounded-2xl glass-panel glass-panel-hover border border-slate-800 space-y-3">
-                <div
-                  onClick={() => toggleExpand(cp.id)}
-                  className="flex flex-col md:flex-row md:items-start justify-between gap-3 cursor-pointer select-none"
-                  title="Click to toggle checkpoint details"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono font-bold text-indigo-400">{cp.id.slice(0, 8)}</span>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                        {cp.task_id}
+                {/* Card Container */}
+                <div className="p-5 rounded-2xl glass-panel glass-panel-hover border border-slate-800 space-y-3">
+                  <div
+                    onClick={() => toggleExpand(cp.id)}
+                    className="flex flex-col md:flex-row md:items-start justify-between gap-3 cursor-pointer select-none"
+                    title="Click to toggle checkpoint details"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono font-bold text-indigo-400">{cp.id.slice(0, 8)}</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                          {cp.task_id}
+                        </span>
+                        {cp.drift ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                            <ShieldAlert className="w-3 h-3 text-amber-400" />
+                            Drift Flagged
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                            Verified
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-sm font-bold text-white pt-1">{cp.summary}</h3>
+                    </div>
+
+                    <span className="text-xs text-slate-500 shrink-0 font-medium">{cp.timestamp}</span>
+                  </div>
+
+                  {/* Metadata Row */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs text-slate-400">
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1">
+                        <GitCommit className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="font-mono text-slate-300">{cp.commit}</span>
                       </span>
-                      {cp.drift ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                          <ShieldAlert className="w-3 h-3 text-amber-400" />
-                          Drift Flagged
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
-                          <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                          Verified
-                        </span>
+                      <span>By {cp.author}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {onNavigateToTab && (
+                        <button
+                          onClick={() => onNavigateToTab('graph')}
+                          className="px-2.5 py-1 rounded-lg bg-purple-600/15 hover:bg-purple-600/30 text-purple-300 hover:text-white font-semibold text-xs border border-purple-500/30 transition-all flex items-center gap-1 cursor-pointer"
+                          title="Inspect project topology graph"
+                        >
+                          <Network className="w-3 h-3" />
+                          <span>Inspect Topology</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onTriggerReasoning(`Resume task ${cp.task_id} from checkpoint ${cp.id.slice(0, 8)}`)}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white font-semibold text-xs border border-indigo-500/30 transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Resume Briefing</span>
+                      </button>
+                      <button
+                        onClick={() => toggleExpand(cp.id)}
+                        className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded Details Drawer */}
+                  {isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-slate-800 space-y-3 bg-slate-900/50 p-4 rounded-xl text-xs">
+                      <div>
+                        <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Active Goals:</span>
+                        <ul className="mt-1 space-y-1 text-slate-300">
+                          {cp.goals?.map((g, i) => (
+                            <li key={i}>• {g}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div>
+                        <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Decisions:</span>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {cp.decisions?.map((d) => (
+                            <span
+                              key={d}
+                              onClick={() => onNavigateToTab && onNavigateToTab('memory')}
+                              className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-mono text-[11px] cursor-pointer hover:bg-indigo-500/25"
+                              title="Click to view decision in Memory"
+                            >
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {cp.driftWarning && (
+                        <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px]">
+                          ⚠️ {cp.driftWarning}
+                        </div>
                       )}
                     </div>
-                    <h3 className="text-sm font-bold text-white pt-1">{cp.summary}</h3>
-                  </div>
-
-                  <span className="text-xs text-slate-500 shrink-0 font-medium">{cp.timestamp}</span>
+                  )}
                 </div>
-
-                {/* Metadata Row */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs text-slate-400">
-                  <div className="flex items-center gap-4">
-                    <span className="flex items-center gap-1">
-                      <GitCommit className="w-3.5 h-3.5 text-slate-500" />
-                      <span className="font-mono text-slate-300">{cp.commit}</span>
-                    </span>
-                    <span>By {cp.author}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {onNavigateToTab && (
-                      <button
-                        onClick={() => onNavigateToTab('graph')}
-                        className="px-2.5 py-1 rounded-lg bg-purple-600/15 hover:bg-purple-600/30 text-purple-300 hover:text-white font-semibold text-xs border border-purple-500/30 transition-all flex items-center gap-1 cursor-pointer"
-                        title="Inspect project topology graph"
-                      >
-                        <Network className="w-3 h-3" />
-                        <span>Inspect Topology</span>
-                      </button>
-                    )}
-                    <button
-                      onClick={() => onTriggerReasoning(`Resume task ${cp.task_id} from checkpoint ${cp.id.slice(0, 8)}`)}
-                      className="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white font-semibold text-xs border border-indigo-500/30 transition-all flex items-center gap-1 cursor-pointer"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      <span>Resume Briefing</span>
-                    </button>
-                    <button
-                      onClick={() => toggleExpand(cp.id)}
-                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-                    >
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Expanded Details Drawer */}
-                {isExpanded && (
-                  <div className="mt-4 pt-4 border-t border-slate-800 space-y-3 bg-slate-900/50 p-4 rounded-xl text-xs">
-                    <div>
-                      <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Active Goals:</span>
-                      <ul className="mt-1 space-y-1 text-slate-300">
-                        {cp.goals?.map((g, i) => (
-                          <li key={i}>• {g}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div>
-                      <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Decisions:</span>
-                      <div className="mt-1 flex flex-wrap gap-1.5">
-                        {cp.decisions?.map((d) => (
-                          <span
-                            key={d}
-                            onClick={() => onNavigateToTab && onNavigateToTab('memory')}
-                            className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-mono text-[11px] cursor-pointer hover:bg-indigo-500/25"
-                            title="Click to view decision in Memory"
-                          >
-                            {d}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {cp.driftWarning && (
-                      <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px]">
-                        ⚠️ {cp.driftWarning}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Weekly Recap Modal */}
       {showRecapModal && (

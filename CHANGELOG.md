@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.9] - 2026-11-05
+
+### Fixed
+- Fixed Studio displaying VectorForce fallback mock decisions, mock checkpoints, and mock invariants when connected to projects with 0 checkpoints (such as `HackathonDemo`).
+- Enhanced `CodeIndexProvider` to automatically filter Python virtual environments (`.venv`, `venv`, `env`), caches (`__pycache__`, `.pytest_cache`), local vector stores (`chroma_db`), and hidden dot-directories so real workspace code is not crowded out.
+- Added cross-module Python import dependency resolution (e.g., `swarm.model_client`, `agents.tools`) to dynamically link architecture topology graphs for multi-agent swarm applications.
+- Added clean empty states across Dashboard, Memory & Ontology, Timeline, and Graph views for new and active workspaces.
+
 ## [0.3.8] - 2026-11-04
 
 ### Added

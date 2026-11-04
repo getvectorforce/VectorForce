@@ -10,7 +10,10 @@ export const SNIPPET_MAX_CHARS = 4000;
 
 const SKIP_DIRS = new Set([
   '.git', 'node_modules', 'dist', 'build', 'coverage', '.vectorforce',
-  '.commandcode', '.agents', 'tmp', '.next', '.cache', 'out', 'vendor', 'target'
+  '.commandcode', '.agents', 'tmp', '.next', '.cache', 'out', 'vendor', 'target',
+  '.venv', 'venv', 'env', '.env', 'virtualenv', '__pycache__', '.pytest_cache',
+  '.mypy_cache', '.ruff_cache', '.tox', 'chroma_db', '.chroma', '.idea', '.vscode',
+  '.cursor', '.kiro', '.muse', '.windsurf', '.github', '.settings'
 ]);
 
 const SKIP_FILE_PATTERNS = [
@@ -103,7 +106,7 @@ export class CodeIndexProvider {
         if (entry.isSymbolicLink()) continue;
 
         if (entry.isDirectory()) {
-          if (SKIP_DIRS.has(name)) continue;
+          if (SKIP_DIRS.has(name) || (name.startsWith('.') && name !== '.')) continue;
           walk(abs, rel);
           continue;
         }
@@ -269,9 +272,24 @@ export class CodeIndexProvider {
     for (const file of files) {
       const dir = posix.dirname(file.path);
       for (const spec of file.symbols.imports) {
-        if (!spec.startsWith('.')) continue;
-        const base = posix.normalize(posix.join(dir, spec));
-        const hit = RESOLUTION_SUFFIXES.map(suffix => base + suffix).find(candidate => known.has(candidate));
+        let hit = null;
+        if (spec.startsWith('.')) {
+          const base = posix.normalize(posix.join(dir, spec));
+          hit = RESOLUTION_SUFFIXES.map(suffix => base + suffix).find(candidate => known.has(candidate));
+        } else {
+          // Check Python workspace imports (e.g. 'swarm.model_client' -> 'swarm/model_client.py')
+          const pyPath = spec.replace(/\./g, '/') + '.py';
+          const pyInit = spec.replace(/\./g, '/') + '/__init__.py';
+          if (known.has(pyPath)) {
+            hit = pyPath;
+          } else if (known.has(pyInit)) {
+            hit = pyInit;
+          } else if (known.has(spec)) {
+            hit = spec;
+          } else {
+            hit = RESOLUTION_SUFFIXES.map(suffix => spec + suffix).find(candidate => known.has(candidate));
+          }
+        }
         if (!hit || hit === file.path) continue;
         const key = `${file.path}->${hit}`;
         if (seen.has(key)) continue;

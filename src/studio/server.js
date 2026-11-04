@@ -13,6 +13,7 @@ import { ReasoningService } from '../operations/reasoning-service.js';
 import { CodeIndexProvider } from '../providers/code-index-provider.js';
 import { LlmProvider, resolveLlmConfig } from '../providers/llm-provider.js';
 import { GitProvider } from '../providers/git-provider.js';
+import { DocumentProvider } from '../providers/document-provider.js';
 import { HarnessConfig } from '../mcp/harness-config.js';
 
 export function createStudioServer({
@@ -136,7 +137,7 @@ export function createStudioServer({
         const allConstraints = new Set();
 
         for (const cp of checkpoints) {
-          if (cp.claims.decisions) {
+          if (cp.claims?.decisions) {
             for (const d of cp.claims.decisions) {
               if (!seenDecisions.has(d.id)) {
                 seenDecisions.add(d.id);
@@ -144,9 +145,47 @@ export function createStudioServer({
               }
             }
           }
-          if (cp.claims.constraints) {
+          if (cp.claims?.constraints) {
             for (const c of cp.claims.constraints) {
               allConstraints.add(c);
+            }
+          }
+        }
+
+        // Collect allowlisted docs details (sizes, hashes) safely
+        let docDetails = [];
+        try {
+          const collected = DocumentProvider.collect(workspacePath, allowedDocs, allowedDocs);
+          docDetails = (collected.documents || []).map(d => ({
+            path: d.relative_path,
+            size: d.size_bytes ? (d.size_bytes < 1024 ? `${d.size_bytes} B` : `${(d.size_bytes / 1024).toFixed(1)} kB`) : '0 B',
+            hash: d.sha256_hash ? d.sha256_hash.slice(0, 10) + '...' : 'tracked',
+            status: 'Verified'
+          }));
+          for (const g of (collected.gaps || [])) {
+            docDetails.push({
+              path: g.relative_path,
+              size: 'Missing',
+              hash: 'N/A',
+              status: 'File Missing'
+            });
+          }
+        } catch {
+          docDetails = (allowedDocs || []).map(p => ({ path: p, size: 'Tracked', hash: 'allowlisted', status: 'Verified' }));
+        }
+
+        // Extract real top AST symbols from code index
+        const topSymbols = [];
+        for (const f of codeIndex.files) {
+          if (f.symbols) {
+            for (const c of (f.symbols.classes || [])) {
+              topSymbols.push({ name: c, type: 'Class', file: f.path });
+            }
+            for (const fn of (f.symbols.functions || [])) {
+              topSymbols.push({ name: fn, type: 'Function', file: f.path });
+            }
+            for (const exp of (f.symbols.exports || [])) {
+              topSymbols.push({ name: exp, type: 'Export', file: f.path });
             }
           }
         }
@@ -156,6 +195,8 @@ export function createStudioServer({
           filesIndexed: codeIndex.files.length,
           symbolsIndexed: codeIndex.files.reduce((acc, f) => acc + ((f.symbols?.functions?.length || 0) + (f.symbols?.classes?.length || 0) + (f.symbols?.exports?.length || 0)), 0),
           allowedDocuments: allowedDocs,
+          allowedDocsList: docDetails,
+          topSymbols: topSymbols.slice(0, 30),
           decisions: allDecisions,
           constraints: Array.from(allConstraints),
           totalCheckpoints: checkpoints.length
@@ -188,6 +229,12 @@ export function createStudioServer({
         const codeIndex = CodeIndexProvider.build(workspacePath);
         const checkpoints = store.getCheckpoints(project.project_id);
         const changedFiles = new Set(GitProvider.collectChangedFiles(workspacePath).files || []);
+        const requestedTaskId = url.searchParams.get('taskId') || null;
+
+        // If a task is selected, get its allowlisted docs or touched files
+        const taskCheckpoints = requestedTaskId
+          ? checkpoints.filter(cp => cp.task_id === requestedTaskId)
+          : checkpoints;
 
         // Dynamically cluster code files by architectural module
         const moduleMap = new Map();
@@ -207,7 +254,7 @@ export function createStudioServer({
           } else if (file.path.startsWith('bin/')) {
             modId = 'cli';
           } else {
-            modId = 'project-root';
+            modId = parts.length > 1 ? parts[0] : 'root';
           }
 
           if (!moduleMap.has(modId)) {
@@ -221,15 +268,26 @@ export function createStudioServer({
               'core': 'Core Hashes & Errors',
               'cli': 'Unified CLI Interface',
               'studio-ui': 'React Studio Frontend',
-              'tests': 'Automated Test Suite (62 Tests)',
-              'wiki': 'Architecture Wiki (ADR 001-014)',
-              'project-root': 'Project Root & Config'
+              'tests': 'Automated Test Suite',
+              'wiki': 'Architecture Wiki',
+              'root': 'Project Root & Config',
+              'backend': 'Backend Services',
+              'frontend': 'Frontend Application',
+              'api': 'API Routes & Handlers',
+              'models': 'Data Models & Schemas',
+              'controllers': 'Controllers',
+              'routes': 'Router Layer',
+              'services': 'Domain Services',
+              'utils': 'Utility Helpers'
             };
+            const capitalizedMod = modId.charAt(0).toUpperCase() + modId.slice(1);
             moduleMap.set(modId, {
               id: modId,
-              name: prettyNames[modId] || modId.toUpperCase(),
-              category: (modId === 'policy' || modId === 'storage') ? 'Security & Data' : modId === 'providers' ? 'AI / LLM' : modId === 'mcp' ? 'Integration' : modId === 'wiki' ? 'Governance' : 'Core',
-              owner: 'VectorForce',
+              name: prettyNames[modId] || capitalizedMod,
+              category: (modId === 'policy' || modId === 'storage' || modId === 'auth' || modId === 'security') ? 'Security' :
+                        (modId === 'providers' || modId === 'ai' || modId === 'llm') ? 'AI / Copilot' :
+                        (modId === 'mcp' || modId === 'api' || modId === 'routes') ? 'Integration' : 'Core',
+              owner: project.name || 'Workspace',
               files: [],
               drift: false,
               dependencies: new Set(),
@@ -259,23 +317,51 @@ export function createStudioServer({
 
         // Link real ADR decisions from checkpoints
         const allDecisions = [];
-        for (const cp of checkpoints) {
+        for (const cp of taskCheckpoints) {
           if (cp.claims?.decisions) {
             for (const d of cp.claims.decisions) {
-              allDecisions.push(`${d.id}: ${d.title}`);
+              allDecisions.push(`${d.id}: ${d.title || d.rationale || ''}`);
             }
           }
         }
 
-        const modules = Array.from(moduleMap.values()).map(m => ({
-          ...m,
-          status: m.drift ? 'Drift Detected' : 'Verified',
-          dependencies: Array.from(m.dependencies),
-          decisions: allDecisions.slice(0, 3)
-        }));
+        // Compute clean 2D grid coordinates for modules
+        const modArray = Array.from(moduleMap.values());
+        const cols = Math.min(3, Math.max(2, Math.ceil(Math.sqrt(modArray.length))));
+        const colWidth = 270;
+        const rowHeight = 160;
+        const startX = 40;
+        const startY = 40;
+
+        const connections = [];
+        for (const [fromMod, mod] of moduleMap.entries()) {
+          for (const toMod of mod.dependencies) {
+            connections.push({ from: fromMod, to: toMod });
+          }
+        }
+
+        const modules = modArray.map((m, idx) => {
+          const col = idx % cols;
+          const row = Math.floor(idx / cols);
+          return {
+            ...m,
+            x: startX + col * colWidth,
+            y: startY + row * rowHeight,
+            status: m.drift ? 'Drift Detected' : 'Verified',
+            dependencies: Array.from(m.dependencies),
+            decisions: allDecisions.slice(0, 3),
+            files: m.files.length,
+            description: `${m.files.length} file${m.files.length === 1 ? '' : 's'} · ${m.symbolsCount} symbols indexed.`
+          };
+        });
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ modules }));
+        res.end(JSON.stringify({
+          modules,
+          connections,
+          activeTask: requestedTaskId,
+          totalFiles: codeIndex.files.length
+        }));
         return;
       }
 

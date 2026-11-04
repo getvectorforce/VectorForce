@@ -19,18 +19,25 @@ export default function Header({
   onOpenCheckpointModal,
   onTriggerReasoning,
   isScanningDrift,
-  onScanDrift
+  onScanDrift,
+  selectedTaskId,
+  onSelectTask
 }) {
   const isDrift = projectData?.health?.driftDetected;
+  const branchName = projectData?.git?.branch || 'main';
+  const commitHash = projectData?.git?.commit
+    ? projectData.git.commit.slice(0, 7)
+    : (projectData?.lastCheckpoint?.commit ? projectData.lastCheckpoint.commit.slice(0, 7) : 'HEAD');
+  const isDirty = !!projectData?.git?.isDirty;
 
   return (
     <header className="h-16 border-b border-slate-800/80 bg-[#090d16]/80 backdrop-blur-md px-6 flex items-center justify-between shrink-0 sticky top-0 z-20">
-      {/* Left: Project identity */}
+      {/* Left: Project identity & Dynamic Git branch */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
           <span className="font-bold text-white text-base tracking-tight">{projectData?.project?.name || 'VectorForce'}</span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
-            {projectData?.project?.id?.slice(0, 12)}...
+          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono" title={projectData?.project?.id}>
+            {projectData?.project?.id ? `${projectData.project.id.slice(0, 10)}...` : 'active'}
           </span>
         </div>
 
@@ -38,10 +45,38 @@ export default function Header({
 
         <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
           <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
-          <span>main</span>
+          <span className="font-semibold text-slate-200">{branchName}</span>
           <span className="text-slate-600">@</span>
-          <span className="text-slate-300">6593b6f</span>
+          <span className="text-slate-300">{commitHash}</span>
+          {isDirty && (
+            <span className="text-[10px] text-amber-400 font-bold px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 ml-0.5" title="Uncommitted changes in local working tree">
+              dirty
+            </span>
+          )}
         </div>
+
+        {/* Dynamic Task Scope Selector */}
+        {Array.isArray(projectData?.tasks) && projectData.tasks.length > 0 && (
+          <>
+            <div className="h-4 w-px bg-slate-800 hidden md:block" />
+            <div className="hidden md:flex items-center gap-1.5 text-xs">
+              <span className="text-slate-500 font-medium">Task:</span>
+              <select
+                value={selectedTaskId || 'all'}
+                onChange={(e) => onSelectTask && onSelectTask(e.target.value)}
+                className="bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-1 text-xs text-indigo-300 font-mono focus:outline-none focus:border-indigo-500 cursor-pointer"
+                title="Filter active workspace scope by task"
+              >
+                <option value="all">All Tasks ({projectData.tasks.length})</option>
+                {projectData.tasks.map((t) => (
+                  <option key={t.task_id} value={t.task_id}>
+                    {t.task_id} · {t.title ? t.title.slice(0, 20) : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Right: Status Pills & Action buttons */}

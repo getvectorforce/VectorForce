@@ -186,7 +186,11 @@ export default function DashboardView({
       {/* Grid of 4 Key Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Card 1: Project Health */}
-        <div className="p-5 rounded-2xl glass-panel glass-panel-hover flex flex-col justify-between">
+        <div
+          onClick={() => onNavigateToTab('timeline')}
+          className="p-5 rounded-2xl glass-panel glass-panel-hover flex flex-col justify-between cursor-pointer"
+          title="Click to inspect workspace verification & drift in Timeline"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Health Score</span>
             <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
@@ -215,6 +219,7 @@ export default function DashboardView({
         <div
           onClick={() => onNavigateToTab('settings')}
           className="p-5 rounded-2xl glass-panel glass-panel-hover flex flex-col justify-between cursor-pointer"
+          title="Click to configure AI reasoning provider"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">AI Reasoning</span>
@@ -246,7 +251,11 @@ export default function DashboardView({
         </div>
 
         {/* Card 3: Ontology & Code Index */}
-        <div className="p-5 rounded-2xl glass-panel glass-panel-hover flex flex-col justify-between">
+        <div
+          onClick={() => onNavigateToTab('memory')}
+          className="p-5 rounded-2xl glass-panel glass-panel-hover flex flex-col justify-between cursor-pointer"
+          title="Click to inspect AST code symbols & allowlisted documents"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ontology &amp; Memory</span>
             <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center">
@@ -270,7 +279,11 @@ export default function DashboardView({
         </div>
 
         {/* Card 4: Checkpoints & Tasks */}
-        <div className="p-5 rounded-2xl glass-panel glass-panel-hover flex flex-col justify-between">
+        <div
+          onClick={() => onNavigateToTab('timeline')}
+          className="p-5 rounded-2xl glass-panel glass-panel-hover flex flex-col justify-between cursor-pointer"
+          title="Click to view full provenance timeline"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Provenance Chain</span>
             <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
@@ -476,7 +489,9 @@ export default function DashboardView({
             {projectData?.checkpoints?.slice(0, 3).map((cp) => (
               <div
                 key={cp.id}
-                className="p-4 rounded-xl glass-panel glass-panel-hover border border-slate-800/80 space-y-2.5"
+                onClick={() => onNavigateToTab('timeline')}
+                className="p-4 rounded-xl glass-panel glass-panel-hover border border-slate-800/80 space-y-2.5 cursor-pointer transition-all hover:border-indigo-500/50"
+                title="Click to inspect checkpoint in Timeline"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -516,7 +531,10 @@ export default function DashboardView({
                       </span>
                     ))}
                     <button
-                      onClick={() => onTriggerReasoning(`Review checkpoint ${cp.id.slice(0, 8)}`)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTriggerReasoning(`Review checkpoint ${cp.id.slice(0, 8)}`);
+                      }}
                       className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 px-2 py-0.5 rounded hover:bg-indigo-500/10 transition-colors cursor-pointer"
                     >
                       Reason ▶

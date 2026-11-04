@@ -19,6 +19,7 @@ export default function App() {
       return 'dashboard';
     }
   });
+  const [selectedTaskId, setSelectedTaskId] = useState('all');
   const [projectData, setProjectData] = useState(initialProjectData);
   const [isCheckpointModalOpen, setIsCheckpointModalOpen] = useState(false);
   const [aiFocusPrompt, setAiFocusPrompt] = useState('');
@@ -43,17 +44,20 @@ export default function App() {
   };
 
   // Fetch real live data from VectorForce API server
-  const loadLiveData = async () => {
+  const loadLiveData = async (taskId = selectedTaskId) => {
     try {
-      const [statusRes, memoryRes, timelineRes] = await Promise.all([
+      const graphUrl = taskId && taskId !== 'all' ? `/api/graph?taskId=${encodeURIComponent(taskId)}` : '/api/graph';
+      const [statusRes, memoryRes, timelineRes, graphRes] = await Promise.all([
         fetch('/api/status').catch(() => null),
         fetch('/api/memory').catch(() => null),
-        fetch('/api/timeline?days=30').catch(() => null)
+        fetch('/api/timeline?days=30').catch(() => null),
+        fetch(graphUrl).catch(() => null)
       ]);
 
       const status = statusRes && statusRes.ok ? await statusRes.json() : null;
       const memory = memoryRes && memoryRes.ok ? await memoryRes.json() : null;
       const timeline = timelineRes && timelineRes.ok ? await timelineRes.json() : null;
+      const graph = graphRes && graphRes.ok ? await graphRes.json() : null;
 
       if (status) {
         const liveCheckpoints = Array.isArray(timeline?.checkpoints)
@@ -78,16 +82,21 @@ export default function App() {
           ...prev,
           project: {
             ...prev.project,
-            name: status.project.name,
-            id: status.project.id,
-            canonical_path: status.project.path || prev.project.canonical_path
+            name: status.project?.name || prev.project.name,
+            id: status.project?.id || prev.project.id,
+            canonical_path: status.project?.path || prev.project.canonical_path
           },
+          git: status.git || prev.git || { branch: 'main', commit: 'HEAD', isDirty: false },
           ai: {
             ...prev.ai,
             ...(status.ai || {})
           },
           tasks: Array.isArray(status.tasks?.list) ? status.tasks.list : prev.tasks,
           allowedDocuments: Array.isArray(memory?.allowedDocuments) ? memory.allowedDocuments : prev.allowedDocuments,
+          allowedDocsList: Array.isArray(memory?.allowedDocsList) ? memory.allowedDocsList : prev.allowedDocsList,
+          topSymbols: Array.isArray(memory?.topSymbols) ? memory.topSymbols : prev.topSymbols,
+          modules: Array.isArray(graph?.modules) && graph.modules.length > 0 ? graph.modules : prev.modules,
+          connections: Array.isArray(graph?.connections) ? graph.connections : prev.connections,
           lastCheckpoint: status.lastCheckpoint || prev.lastCheckpoint,
           checkpoints: liveCheckpoints && liveCheckpoints.length > 0 ? liveCheckpoints : prev.checkpoints,
           decisions: Array.isArray(memory?.decisions) && memory.decisions.length > 0 ? memory.decisions : prev.decisions,
@@ -102,14 +111,19 @@ export default function App() {
           },
           health: {
             ...prev.health,
-            score: status.health.score,
-            driftDetected: status.health.driftDetected
+            score: status.health?.score ?? prev.health.score,
+            driftDetected: status.health?.driftDetected ?? prev.health.driftDetected
           }
         }));
       }
     } catch {
       // Fallback to rich embedded data
     }
+  };
+
+  const handleSelectTask = (taskId) => {
+    setSelectedTaskId(taskId);
+    loadLiveData(taskId);
   };
 
   useEffect(() => {
@@ -188,6 +202,8 @@ export default function App() {
           onTriggerReasoning={handleTriggerReasoning}
           isScanningDrift={isScanningDrift}
           onScanDrift={handleScanDrift}
+          selectedTaskId={selectedTaskId}
+          onSelectTask={handleSelectTask}
         />
 
         {/* View Routing */}
@@ -224,6 +240,7 @@ export default function App() {
             <TimelineView
               projectData={projectData}
               onTriggerReasoning={handleTriggerReasoning}
+              onNavigateToTab={setCurrentTab}
             />
           )}
 

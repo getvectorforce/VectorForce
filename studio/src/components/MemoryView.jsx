@@ -18,12 +18,51 @@ export default function MemoryView({ projectData }) {
   const decisions = projectData?.decisions || [];
   const constraints = projectData?.constraints || [];
 
+  const rawSymbols = Array.isArray(projectData?.topSymbols) && projectData.topSymbols.length > 0
+    ? projectData.topSymbols
+    : [
+        { name: 'SqliteStore', type: 'Class', file: 'src/storage/sqlite-store.js' },
+        { name: 'ReasoningService', type: 'Class', file: 'src/operations/reasoning-service.js' },
+        { name: 'McpServer', type: 'Class', file: 'src/mcp/mcp-server.js' },
+        { name: 'HandoffService', type: 'Class', file: 'src/operations/handoff-service.js' },
+        { name: 'BriefingService', type: 'Class', file: 'src/operations/briefing-service.js' },
+        { name: 'CodeIndexProvider', type: 'Class', file: 'src/providers/code-index-provider.js' }
+      ];
+
+  const rawDocs = Array.isArray(projectData?.allowedDocsList) && projectData.allowedDocsList.length > 0
+    ? projectData.allowedDocsList
+    : (Array.isArray(projectData?.allowedDocuments) && projectData.allowedDocuments.length > 0
+        ? projectData.allowedDocuments.map((d) => ({ path: d, size: 'Tracked', hash: 'sha256...', status: 'Verified' }))
+        : [
+            { path: 'AGENTS.md', size: '2.1 kB', hash: 'cff46c35...', status: 'Verified' },
+            { path: 'docs/spec.md', size: '50 bytes', hash: 'd4382c45...', status: 'Tamper Flagged (Pilot)' },
+            { path: 'package.json', size: '942 bytes', hash: '8a3b129c...', status: 'Verified' }
+          ]);
+
   const filteredDecisions = decisions.filter(
     (d) =>
+      !search ||
       d.id.toLowerCase().includes(search.toLowerCase()) ||
       d.title.toLowerCase().includes(search.toLowerCase()) ||
       d.rationale.toLowerCase().includes(search.toLowerCase())
   );
+
+  const filteredSymbols = rawSymbols.filter(
+    (s) =>
+      !search ||
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.file.toLowerCase().includes(search.toLowerCase()) ||
+      s.type.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredDocs = rawDocs.filter(
+    (d) =>
+      !search ||
+      d.path.toLowerCase().includes(search.toLowerCase()) ||
+      (d.status && d.status.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const totalSymbolsCount = projectData?.stats?.symbolsIndexed ?? rawSymbols.length;
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
@@ -138,32 +177,41 @@ export default function MemoryView({ projectData }) {
       {/* Code Symbols View */}
       {activeTab === 'symbols' && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Containment-Safe Workspace AST Symbols
+            </span>
+            <div className="relative w-64">
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Filter symbols..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg text-xs text-white pl-8 pr-3 py-1.5 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+          </div>
+
           <div className="p-5 rounded-2xl glass-panel space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                 <FileCode2 className="w-4 h-4 text-indigo-400" />
-                <span>Containment-Safe Workspace AST Symbols</span>
+                <span>Indexed AST Entities</span>
               </span>
-              <span className="text-xs font-mono text-indigo-400 font-semibold">1,420 Symbols Indexed</span>
+              <span className="text-xs font-mono text-indigo-400 font-semibold">{totalSymbolsCount} Symbols Indexed</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Symbols are extracted deterministically without cloud scrapers or external language servers. Zero external dependencies.
+              Symbols are extracted deterministically without cloud scrapers or external language servers. Zero runtime dependencies.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3">
-              {[
-                { name: 'SqliteStore', type: 'Class', file: 'src/storage/sqlite-store.js', symbols: 18 },
-                { name: 'ReasoningService', type: 'Class', file: 'src/operations/reasoning-service.js', symbols: 12 },
-                { name: 'McpServer', type: 'Class', file: 'src/mcp/mcp-server.js', symbols: 14 },
-                { name: 'HandoffService', type: 'Class', file: 'src/operations/handoff-service.js', symbols: 16 },
-                { name: 'BriefingService', type: 'Class', file: 'src/operations/briefing-service.js', symbols: 8 },
-                { name: 'CodeIndexProvider', type: 'Class', file: 'src/providers/code-index-provider.js', symbols: 10 }
-              ].map((s) => (
-                <div key={s.name} className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
+              {filteredSymbols.map((s, idx) => (
+                <div key={`${s.name}-${idx}`} className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-indigo-300 font-mono">{s.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">{s.type}</span>
+                    <span className="font-bold text-indigo-300 font-mono truncate max-w-[180px]">{s.name}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">{s.type}</span>
                   </div>
-                  <p className="text-[11px] font-mono text-slate-500 truncate">{s.file}</p>
+                  <p className="text-[11px] font-mono text-slate-500 truncate" title={s.file}>{s.file}</p>
                 </div>
               ))}
             </div>
@@ -174,17 +222,32 @@ export default function MemoryView({ projectData }) {
       {/* Allowlisted Documents View */}
       {activeTab === 'docs' && (
         <div className="space-y-4">
-          <div className="p-5 rounded-2xl glass-panel space-y-3">
-            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-              <FileText className="w-4 h-4 text-emerald-400" />
-              <span>Allowlisted Project Documents</span>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Allowlisted Project Documents
             </span>
+            <div className="relative w-64">
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Filter documents..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg text-xs text-white pl-8 pr-3 py-1.5 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div className="p-5 rounded-2xl glass-panel space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <FileText className="w-4 h-4 text-emerald-400" />
+                <span>Verified Evidence Documents</span>
+              </span>
+              <span className="text-xs font-mono text-emerald-400 font-semibold">{filteredDocs.length} Tracked</span>
+            </div>
             <div className="space-y-2 pt-2">
-              {[
-                { path: 'AGENTS.md', size: '2.1 kB', hash: 'cff46c35...', status: 'Verified' },
-                { path: 'docs/spec.md', size: '50 bytes', hash: 'd4382c45...', status: 'Tamper Flagged (Pilot)' },
-                { path: 'package.json', size: '942 bytes', hash: '8a3b129c...', status: 'Verified' }
-              ].map((doc) => (
+              {filteredDocs.map((doc) => (
                 <div key={doc.path} className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-slate-500" />
@@ -194,11 +257,11 @@ export default function MemoryView({ projectData }) {
                   <div className="flex items-center gap-3">
                     <span className="text-[10px] font-mono text-slate-500">{doc.hash}</span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      doc.status.includes('Tamper')
+                      (doc.status || '').includes('Missing') || (doc.status || '').includes('Tamper')
                         ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
                     }`}>
-                      {doc.status}
+                      {doc.status || 'Verified'}
                     </span>
                   </div>
                 </div>

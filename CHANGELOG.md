@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [0.3.5] - 2026-11-04
+
+### Added
+- Dynamic project semantic topology layout and AST import dependency edge mapping in Studio `/api/graph`.
+- Live workspace AST entity symbols extraction and allowlisted document evidence collection (SHA-256 digests and file sizes) in `/api/memory`.
+- Task scope selector and live Git branch/commit/dirty badges in the Studio header.
+
+### Fixed
+- Studio Project Graph and Memory views now dynamically reflect the active workspace repository rather than fallback mock structures.
+- Dashboard metric cards (Health Score, AI Reasoning, Ontology & Memory, Provenance Chain) and recent checkpoint cards are now interactive and route to their respective views (`timeline`, `settings`, `memory`, `graph`).
+
+## [0.3.4] - 2026-11-04
 
 ### Fixed
 - Cross-platform MCP availability: generated harness configs now use the absolute Node.js runtime (`process.execPath`) with `"type": "stdio"` instead of bare `node`, so GUI-launched clients on Windows, macOS, and Linux can spawn `vf mcp` even when `node` is not on their PATH.

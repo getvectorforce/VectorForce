@@ -17,32 +17,42 @@ import {
 } from 'lucide-react';
 
 export default function ProjectGraphView({ projectData, onTriggerReasoning }) {
-  const [selectedNodeId, setSelectedNodeId] = useState('auth-service');
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const modules = projectData?.modules || [];
-  const selectedModule = modules.find((m) => m.id === selectedNodeId) || modules[0];
+  const activeNodeId = selectedNodeId || (modules[0]?.id ?? '');
+  const selectedModule = modules.find((m) => m.id === activeNodeId) || modules[0];
+
+  const uniqueCategories = ['all', ...Array.from(new Set(modules.map((m) => m.category).filter(Boolean)))];
 
   const filteredModules = modules.filter((m) => {
-    const matchesCategory = categoryFilter === 'all' || m.category.toLowerCase() === categoryFilter.toLowerCase();
-    const matchesSearch = !searchQuery || m.name.toLowerCase().includes(searchQuery.toLowerCase()) || m.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || (m.category && m.category.toLowerCase() === categoryFilter.toLowerCase());
+    const matchesSearch = !searchQuery ||
+      (m.name && m.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (m.id && m.id.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
 
-  // Calculate connection lines between nodes
-  const connections = [
-    { from: 'mcp-bridge', to: 'context-store' },
-    { from: 'mcp-bridge', to: 'auth-service' },
-    { from: 'mcp-bridge', to: 'ai-reasoning' },
-    { from: 'auth-service', to: 'context-store' },
-    { from: 'ai-reasoning', to: 'code-index' },
-    { from: 'ai-reasoning', to: 'context-store' },
-    { from: 'ai-reasoning', to: 'briefing-engine' },
-    { from: 'code-index', to: 'context-store' },
-    { from: 'briefing-engine', to: 'context-store' },
-    { from: 'handoff-service', to: 'context-store' }
-  ];
+  // Calculate connection lines between nodes from live dependency graph or fallback
+  const connections = Array.isArray(projectData?.connections) && projectData.connections.length > 0
+    ? projectData.connections
+    : [
+        { from: 'mcp-bridge', to: 'context-store' },
+        { from: 'mcp-bridge', to: 'auth-service' },
+        { from: 'mcp-bridge', to: 'ai-reasoning' },
+        { from: 'auth-service', to: 'context-store' },
+        { from: 'ai-reasoning', to: 'code-index' },
+        { from: 'ai-reasoning', to: 'context-store' },
+        { from: 'ai-reasoning', to: 'briefing-engine' },
+        { from: 'code-index', to: 'context-store' },
+        { from: 'briefing-engine', to: 'context-store' },
+        { from: 'handoff-service', to: 'context-store' }
+      ];
+
+  const canvasWidth = Math.max(1050, ...modules.map((m) => (m.x || 0) + 260));
+  const canvasHeight = Math.max(700, ...modules.map((m) => (m.y || 0) + 180));
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
@@ -75,7 +85,7 @@ export default function ProjectGraphView({ projectData, onTriggerReasoning }) {
 
             {/* Category Filter */}
             <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
-              {['all', 'Security', 'AI / Copilot', 'Core', 'Integration'].map((cat) => (
+              {uniqueCategories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCategoryFilter(cat)}
@@ -134,9 +144,9 @@ export default function ProjectGraphView({ projectData, onTriggerReasoning }) {
           </svg>
 
           {/* Render Nodes */}
-          <div className="relative w-[1000px] h-[650px]">
+          <div className="relative" style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }}>
             {filteredModules.map((mod) => {
-              const isSelected = mod.id === selectedNodeId;
+              const isSelected = mod.id === activeNodeId;
               const hasDrift = mod.drift;
               return (
                 <div

@@ -10,10 +10,11 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
-  FileText
+  FileText,
+  Network
 } from 'lucide-react';
 
-export default function TimelineView({ projectData, onTriggerReasoning }) {
+export default function TimelineView({ projectData, onTriggerReasoning, onNavigateToTab }) {
   const [expandedId, setExpandedId] = useState(null);
   const [showRecapModal, setShowRecapModal] = useState(false);
 
@@ -59,7 +60,11 @@ export default function TimelineView({ projectData, onTriggerReasoning }) {
 
               {/* Card Container */}
               <div className="p-5 rounded-2xl glass-panel glass-panel-hover border border-slate-800 space-y-3">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                <div
+                  onClick={() => toggleExpand(cp.id)}
+                  className="flex flex-col md:flex-row md:items-start justify-between gap-3 cursor-pointer select-none"
+                  title="Click to toggle checkpoint details"
+                >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-mono font-bold text-indigo-400">{cp.id.slice(0, 8)}</span>
@@ -95,16 +100,26 @@ export default function TimelineView({ projectData, onTriggerReasoning }) {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {onNavigateToTab && (
+                      <button
+                        onClick={() => onNavigateToTab('graph')}
+                        className="px-2.5 py-1 rounded-lg bg-purple-600/15 hover:bg-purple-600/30 text-purple-300 hover:text-white font-semibold text-xs border border-purple-500/30 transition-all flex items-center gap-1 cursor-pointer"
+                        title="Inspect project topology graph"
+                      >
+                        <Network className="w-3 h-3" />
+                        <span>Inspect Topology</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => onTriggerReasoning(`Resume task ${cp.task_id} from checkpoint ${cp.id.slice(0, 8)}`)}
-                      className="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white font-semibold text-xs border border-indigo-500/30 transition-all flex items-center gap-1"
+                      className="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white font-semibold text-xs border border-indigo-500/30 transition-all flex items-center gap-1 cursor-pointer"
                     >
                       <Sparkles className="w-3 h-3" />
                       <span>Resume Briefing</span>
                     </button>
                     <button
                       onClick={() => toggleExpand(cp.id)}
-                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                     >
                       {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
@@ -127,7 +142,12 @@ export default function TimelineView({ projectData, onTriggerReasoning }) {
                       <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Decisions:</span>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         {cp.decisions?.map((d) => (
-                          <span key={d} className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-mono text-[11px]">
+                          <span
+                            key={d}
+                            onClick={() => onNavigateToTab && onNavigateToTab('memory')}
+                            className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-mono text-[11px] cursor-pointer hover:bg-indigo-500/25"
+                            title="Click to view decision in Memory"
+                          >
                             {d}
                           </span>
                         ))}

@@ -7,7 +7,9 @@
 </p>
 
 [![Website](https://img.shields.io/badge/website-getvectorforce.github.io-6366f1.svg)](https://getvectorforce.github.io/)
-[![Demo Video](https://img.shields.io/badge/demo-watch%20video%20(2m%2021s)-red.svg)](https://getvectorforce.github.io/#demo-video)
+[![YouTube Demo](https://img.shields.io/badge/YouTube-Watch%20Demo%20(2m%2021s)-FF0000.svg?logo=youtube&logoColor=white)](https://youtu.be/Ufb_IjCU2l4)
+[![X (Twitter)](https://img.shields.io/badge/X-@Vectorforce26-000000.svg?logo=x&logoColor=white)](https://x.com/Vectorforce26/status/2118121822176809265)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-VectorForce-0A66C2.svg?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/vectorforce)
 [![Tests](https://img.shields.io/badge/tests-94%20passing%20(Linux%20%7C%20macOS%20%7C%20Windows)-brightgreen.svg)](https://github.com/getvectorforce/VectorForce/actions)
 [![Dependencies](https://img.shields.io/badge/backend%20runtime%20deps-zero-blue.svg)](#architecture-invariants)
 [![Storage](https://img.shields.io/badge/storage-local%20SQLite%20WAL-orange.svg)](#local-first-architecture)
@@ -16,12 +18,21 @@
 
 ---
 
+## 🌐 Official Links & Community
+- 🌍 **Official Website:** [https://getvectorforce.github.io/](https://getvectorforce.github.io/)
+- 🎬 **YouTube Demo Video:** [https://youtu.be/Ufb_IjCU2l4](https://youtu.be/Ufb_IjCU2l4)
+- 🐦 **X (Twitter):** [@Vectorforce26](https://x.com/Vectorforce26) • [Contest Announcement Post](https://x.com/Vectorforce26/status/2118121822176809265)
+- 💼 **LinkedIn:** [VectorForce Company Page](https://www.linkedin.com/company/vectorforce)
+- 📦 **NPM Registry:** [https://www.npmjs.com/package/vectorforce](https://www.npmjs.com/package/vectorforce)
+
+---
+
 ## 🎬 Product Demo Video (2m 21s)
 
 > **Watch how VectorForce eliminates Coding Agent Amnesia across 8 AI harnesses:**
 
-[![VectorForce Demo Video](https://img.shields.io/badge/Watch%20Demo%20Video-2m%2021s-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://getvectorforce.github.io/#demo-video)
-[![Interactive Demo](https://img.shields.io/badge/Interactive-Watch%20on%20Official%20Site-6366f1?style=for-the-badge&logo=googlechrome&logoColor=white)](https://getvectorforce.github.io/#demo-video)
+[![VectorForce Demo Video](https://img.shields.io/badge/Watch%20on%20YouTube-2m%2021s-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/Ufb_IjCU2l4)
+[![Interactive Site Demo](https://img.shields.io/badge/Interactive-Watch%20on%20Official%20Site-6366f1?style=for-the-badge&logo=googlechrome&logoColor=white)](https://getvectorforce.github.io/#demo-video)
 
 | Timestamp | Chapter | Milestone Demonstrated |
 | :--- | :--- | :--- |

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.3.5] - 2026-11-04
+## [0.3.8] - 2026-11-04
 
 ### Added
 - Dynamic project semantic topology layout and AST import dependency edge mapping in Studio `/api/graph`.

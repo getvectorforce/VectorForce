@@ -20,6 +20,8 @@
 
 ## 🌐 Official Links & Community
 - 🌍 **Official Website:** [https://getvectorforce.github.io/](https://getvectorforce.github.io/)
+- ☁️ **VectorForce Cloud Login:** [Live SSO Portal](https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run/login)
+- 📖 **Developer Support & Integration Guide:** [DEVELOPER_SUPPORT.md](./DEVELOPER_SUPPORT.md)
 - 🎬 **YouTube Demo Video:** [https://youtu.be/Ufb_IjCU2l4](https://youtu.be/Ufb_IjCU2l4)
 - 🐦 **X (Twitter):** [@Vectorforce26](https://x.com/Vectorforce26) • [Contest Announcement Post](https://x.com/Vectorforce26/status/2118121822176809265)
 - 💼 **LinkedIn:** [VectorForce Company Page](https://www.linkedin.com/company/vectorforce)

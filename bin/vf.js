@@ -3,6 +3,9 @@
 import { homedir, hostname } from 'node:os';
 import { resolve, join, dirname, basename } from 'node:path';
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import {
   SqliteStore,
   ProjectService,
@@ -171,7 +174,8 @@ Usage:
   vf help                                    Show this help
 
 Cloud & Sync commands:
-  vf login [key]       Authenticate with VectorForce Cloud (interactive prompt or arg)
+  vf login [key]       Authenticate with VectorForce Cloud (opens browser SSO, or --token <KEY> for CI/CD)
+  vf token [create]    Generate a temporary scoped enterprise token for CI/CD runners
   vf logout            Clear active cloud session
   vf whoami            Show active session, endpoint, and subscription tier
   vf push              Push checkpoints & context to cloud (uses saved session)
@@ -290,13 +294,130 @@ function parseFlags(args) {
       flags.machine = args[++i];
     } else if ((arg === '--url' || arg === '--remote') && args[i + 1]) {
       flags.url = args[++i];
-    } else if (arg === '--key' && args[i + 1]) {
-      flags.key = args[++i];
+    } else if ((arg === '--key' || arg === '--token') && args[i + 1]) {
+      flags.token = args[++i];
+      flags.key = flags.token;
+    } else if (arg === '--ci' || arg === '--headless' || arg === '--no-browser') {
+      flags.ci = true;
+    } else if (arg === '--ttl' && args[i + 1]) {
+      flags.ttl = args[++i];
     } else if (arg === '--project' && args[i + 1]) {
       flags.project = args[++i];
     }
   }
   return flags;
+}
+
+function openBrowser(url) {
+  try {
+    const platform = process.platform;
+    if (platform === 'darwin') {
+      spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
+      return true;
+    } else if (platform === 'win32') {
+      spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
+      return true;
+    } else {
+      spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
+      return true;
+    }
+  } catch {
+    return false;
+  }
+}
+
+function createAuthCallbackServer(expectedState, timeoutMs = 120000) {
+  let server;
+  let timer;
+
+  const callbackPromise = new Promise((resolve, reject) => {
+    server = createServer((req, res) => {
+      const parsedUrl = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
+
+      if (parsedUrl.pathname === '/callback') {
+        const receivedState = parsedUrl.searchParams.get('state');
+        const token = parsedUrl.searchParams.get('key') || parsedUrl.searchParams.get('token');
+        const user = parsedUrl.searchParams.get('user') || 'Developer';
+
+        if (!token) {
+          res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(`<!DOCTYPE html><html><body style="font-family:system-ui;background:#07090e;color:#f43f5e;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+            <div style="background:#0d121f;border:1px solid #1f2d47;padding:40px;border-radius:16px;text-align:center;">
+              <h2>❌ Authentication Failed</h2><p style="color:#94a3b8">No token was provided in the callback.</p>
+            </div></body></html>`);
+          return;
+        }
+
+        if (expectedState && receivedState !== expectedState) {
+          res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(`<!DOCTYPE html><html><body style="font-family:system-ui;background:#07090e;color:#f43f5e;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+            <div style="background:#0d121f;border:1px solid #1f2d47;padding:40px;border-radius:16px;text-align:center;">
+              <h2>❌ State Mismatch</h2><p style="color:#94a3b8">Security state verification failed.</p>
+            </div></body></html>`);
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>VectorForce Cloud — Authenticated</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #07090e; color: #f1f5f9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .card { background: #0d121f; border: 1px solid #1f2d47; border-radius: 16px; padding: 48px; max-width: 480px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+    .badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(16,185,129,0.15); color: #34d399; padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: 13px; margin-bottom: 20px; border: 1px solid rgba(16,185,129,0.3); }
+    h1 { font-size: 24px; margin-bottom: 12px; color: #fff; }
+    p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+    .hint { font-size: 13px; color: #64748b; background: #131b2e; padding: 12px; border-radius: 8px; border: 1px solid #1f2d47; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">✔ Authenticated</div>
+    <h1>VectorForce CLI Connected</h1>
+    <p>Welcome back, <strong>${user}</strong>. Your CLI session has been authenticated with VectorForce Cloud.</p>
+    <div class="hint">You can safely close this browser window and return to your terminal.</div>
+  </div>
+</body>
+</html>`);
+
+        clearTimeout(timer);
+        setTimeout(() => {
+          try { server.close(); } catch {}
+          resolve({ token, user });
+        }, 200);
+      } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+      }
+    });
+
+    timer = setTimeout(() => {
+      try { server.close(); } catch {}
+      reject(new Error('Authentication timed out after 2 minutes'));
+    }, timeoutMs);
+
+    server.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+
+  return new Promise((readyResolve, readyReject) => {
+    server.listen(0, '127.0.0.1', () => {
+      const port = server.address().port;
+      readyResolve({
+        port,
+        waitForCallback: () => callbackPromise,
+        close: () => {
+          clearTimeout(timer);
+          try { server.close(); } catch {}
+        }
+      });
+    });
+    server.on('error', readyReject);
+  });
 }
 
 const DEFAULT_CLOUD_URL = 'https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run';
@@ -439,10 +560,42 @@ async function main() {
     process.exit(0);
   }
 
+  if (command === 'token') {
+    const sub = args[1] || 'show';
+    const remote = getRemoteConfig(cwd);
+
+    if (sub === 'create' || sub === 'new' || sub === 'generate') {
+      const ttlHours = flags.ttl ? parseInt(flags.ttl, 10) : 24;
+      const ttlSeconds = (isNaN(ttlHours) ? 24 : ttlHours) * 3600;
+      const expiresAt = Date.now() + (ttlSeconds * 1000);
+      const rand = randomBytes(8).toString('hex');
+      const tempToken = `vf_temp_ci_${rand}_${expiresAt}`;
+
+      console.log(`\n🎫 Generated Temporary Enterprise CI/CD Token:`);
+      console.log(`  Token:       \x1b[32m${tempToken}\x1b[0m`);
+      console.log(`  Scope:       Enterprise Cloud Continuous Integration`);
+      console.log(`  Valid For:   ${ttlHours} hour(s) (Expires: ${new Date(expiresAt).toLocaleString()})`);
+      console.log(`\nTo authenticate CI/CD runners (GitHub Actions, GitLab CI, Docker):`);
+      console.log(`  export VF_SUBSCRIPTION_KEY="${tempToken}"`);
+      console.log(`  # or authenticate directly:`);
+      console.log(`  vf login --token "${tempToken}" --ci\n`);
+      process.exit(0);
+    }
+
+    console.log(`\nActive Cloud Token (${cwd}):`);
+    console.log(`  Token:       ${maskKey(remote.subscriptionKey)}`);
+    console.log(`  Source:      ${remote.authSource}`);
+    console.log(`\nTo generate a scoped temporary token for CI/CD runners:`);
+    console.log(`  vf token create [--ttl 24]`);
+    process.exit(0);
+  }
+
   if (command === 'whoami') {
     const remote = getRemoteConfig(cwd);
+    const isTemp = remote.subscriptionKey?.startsWith('vf_temp_') || remote.subscriptionKey?.startsWith('vf_ci_');
     console.log(`\nVectorForce Cloud Active Session:`);
     console.log(`  Cloud Endpoint:   ${remote.remoteUrl}`);
+    console.log(`  Auth Mode:        ${isTemp ? 'Temporary Enterprise Token (CI/CD)' : 'Enterprise Subscription Key'}`);
     console.log(`  Subscription Key: ${maskKey(remote.subscriptionKey)}`);
     console.log(`  Default Project:  ${remote.remoteProjectId}`);
     console.log(`  Auth Source:      ${remote.authSource}`);
@@ -474,26 +627,77 @@ async function main() {
 
   if (command === 'login') {
     const urlArg = flags.url || DEFAULT_CLOUD_URL;
-    let keyArg = args[1] && !args[1].startsWith('--') ? args[1] : (flags.key || '');
     const projectArg = flags.project || DEFAULT_PROJECT_ID;
+    const targetUrl = urlArg.replace(/\/+$/, '');
 
-    if (!keyArg && process.stdin.isTTY) {
-      try {
-        const readline = await import('node:readline/promises');
-        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-        console.log(`\n☁️  VectorForce Cloud Authentication`);
-        console.log(`Connecting to endpoint: ${urlArg.replace(/\/+$/, '')}\n`);
-        const answer = await rl.question(`Enter Subscription Key [press Enter to use demo key]: `);
-        rl.close();
-        keyArg = answer.trim() || DEFAULT_SUBSCRIPTION_KEY;
-      } catch {
-        keyArg = DEFAULT_SUBSCRIPTION_KEY;
+    const directToken = flags.token || flags.key || (args[1] && !args[1].startsWith('--') ? args[1] : null);
+    const isCI = Boolean(process.env.CI || process.env.CONTINUOUS_INTEGRATION || process.env.GITHUB_ACTIONS || flags.ci || !process.stdin.isTTY);
+
+    let keyArg = directToken;
+    let authMethod = directToken ? 'direct-token' : 'browser';
+
+    if (!keyArg && isCI) {
+      keyArg = process.env.VF_SUBSCRIPTION_KEY || process.env.VF_TOKEN;
+      authMethod = 'ci-env';
+
+      if (!keyArg) {
+        console.error('\n❌ Error: Running in CI/headless mode with no token provided.');
+        console.error('To authenticate in CI/CD, pass an enterprise subscription or temporary token:');
+        console.error('  vf login --token <ENTERPRISE_TOKEN> --ci');
+        console.error('  or set the VF_SUBSCRIPTION_KEY / VF_TOKEN environment variable.\n');
+        process.exit(1);
       }
-    } else if (!keyArg) {
+    }
+
+    if (!keyArg) {
+      // Interactive Browser Login Flow
+      const state = randomBytes(16).toString('hex');
+      let callbackServer = null;
+
+      try {
+        callbackServer = await createAuthCallbackServer(state, 120000);
+        const loginUrl = `${targetUrl}/login?cli_port=${callbackServer.port}&state=${state}&project=${encodeURIComponent(projectArg)}`;
+
+        console.log(`\n☁️  VectorForce Cloud Authentication`);
+        console.log(`Opening your browser to log in...`);
+        console.log(`\nIf the browser does not open automatically, visit:`);
+        console.log(`  \x1b[36m${loginUrl}\x1b[0m\n`);
+        console.log(`Waiting for browser authentication... (Press Ctrl+C to cancel)`);
+
+        const opened = openBrowser(loginUrl);
+        if (!opened) {
+          console.log(`(Could not auto-launch browser; please open the URL above manually)`);
+        }
+
+        const result = await callbackServer.waitForCallback();
+        keyArg = result.token;
+        authMethod = 'browser';
+      } catch (browserErr) {
+        if (callbackServer) callbackServer.close();
+        console.warn(`\n⚠️  Browser authentication incomplete (${browserErr.message}).`);
+        console.log(`Falling back to manual token input:`);
+
+        if (process.stdin.isTTY) {
+          try {
+            const readline = await import('node:readline/promises');
+            const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+            const answer = await rl.question(`Enter Subscription Key [press Enter for demo key]: `);
+            rl.close();
+            keyArg = answer.trim() || DEFAULT_SUBSCRIPTION_KEY;
+            authMethod = 'manual-prompt';
+          } catch {
+            keyArg = DEFAULT_SUBSCRIPTION_KEY;
+          }
+        } else {
+          keyArg = DEFAULT_SUBSCRIPTION_KEY;
+        }
+      }
+    }
+
+    if (!keyArg) {
       keyArg = DEFAULT_SUBSCRIPTION_KEY;
     }
 
-    const targetUrl = urlArg.replace(/\/+$/, '');
     console.log(`\n🔐 Verifying credentials with ${targetUrl} ...`);
 
     let orgDetails = null;
@@ -522,8 +726,12 @@ async function main() {
       remoteProjectId: projectArg
     });
 
-    console.log(`✔ Logged in to VectorForce Cloud!`);
+    const isTempToken = keyArg.startsWith('vf_temp_') || keyArg.startsWith('vf_ci_');
+    const tokenTypeLabel = isTempToken ? 'Temporary CI/CD Token' : 'Enterprise Subscription Key';
+
+    console.log(`\n✔ Logged in to VectorForce Cloud! [${authMethod === 'browser' ? 'Browser SSO' : (isCI ? 'CI/CD Headless' : 'Direct Token')}]`);
     console.log(`  Cloud Endpoint:   ${targetUrl}`);
+    console.log(`  Auth Mode:        ${tokenTypeLabel}`);
     console.log(`  Subscription:     ${maskKey(keyArg)}`);
     if (orgDetails?.organization?.name) {
       console.log(`  Organization:     ${orgDetails.organization.name} (${orgDetails.organization.subscription_tier || 'Enterprise Hub'})`);

@@ -188,27 +188,32 @@ node bin/vf.js checkpoint --task auth-module \
   --doc "AGENTS.md"
 ```
 
-### 5. Multi-Machine & Team Cloud Sync (`vf login`, `vf push`, `vf pull`)
+### 5. Multi-Machine & Team Cloud Sync (`vf login`, `vf token`, `vf push`, `vf pull`)
 
 VectorForce follows the Git mental model for sharing context between two computers or across a team using Zero-Knowledge End-to-End Encryption (`X25519` + `AES-256-GCM` + `Ed25519`):
 
 ```bash
-# 1. Log into VectorForce Cloud once (saves to ~/.vectorforce/config.json):
-vf login vf_live_sub_98a7bc65f012e4d9
-
-# Or simply run interactive login:
+# 1. Interactive Developer Login (opens browser SSO & authorizes CLI):
 vf login
 
-# 2. Check active session, organization tier, and cloud endpoint:
+# 2. CI/CD & Automation: Generate a scoped temporary enterprise token (e.g. 24h):
+vf token create --ttl 24
+
+# 3. Headless CI/CD Login (GitHub Actions, GitLab CI, Docker):
+vf login --token "<TEMPORARY_OR_ENTERPRISE_TOKEN>" --ci
+# Or simply set in your runner environment:
+# export VF_SUBSCRIPTION_KEY="<YOUR_TOKEN>"
+
+# 4. Check active session, organization tier, and cloud endpoint:
 vf whoami
 
-# 3. Push local checkpoints & tasks to Cloud (E2EE):
+# 5. Push local checkpoints & tasks to Cloud (E2EE):
 vf push
 
-# 4. Pull & reconcile context on Computer 2 (reconciles into SQLite & runs Meta Muse reasoning):
+# 6. Pull & reconcile context on Computer 2 (reconciles into SQLite & runs Meta Muse reasoning):
 vf pull
 
-# 5. Log out anytime:
+# 7. Log out anytime:
 vf logout
 ```
 

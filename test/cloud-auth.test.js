@@ -49,7 +49,24 @@ test('VectorForce Cloud CLI Auth: login, whoami, and logout', () => {
     assert.ok(postLoginWhoami.includes('Subscription Key: vf_live_sub_'));
     assert.ok(postLoginWhoami.includes('Default Project:  proj-meta-e2ee'));
 
-    // 4. Perform vf logout
+    // 4. Test temporary CI/CD token generation
+    const tokenCreateOut = runVf(['token', 'create', '--ttl', '12']);
+    assert.ok(tokenCreateOut.includes('Generated Temporary Enterprise CI/CD Token:'));
+    assert.ok(tokenCreateOut.includes('vf_temp_ci_'));
+    const tempTokenMatch = tokenCreateOut.match(/(vf_temp_ci_[a-z0-9_]+)/i);
+    assert.ok(tempTokenMatch, 'Should find generated temp token');
+    const tempToken = tempTokenMatch[1];
+
+    // 5. Authenticate in CI mode with the temporary token
+    const ciLoginOut = runVf(['login', '--token', tempToken, '--ci']);
+    assert.ok(ciLoginOut.includes('CI/CD Headless'));
+    assert.ok(ciLoginOut.includes('Temporary CI/CD Token'));
+
+    // Verify whoami reflects temporary token
+    const tempWhoami = runVf(['whoami']);
+    assert.ok(tempWhoami.includes('Temporary Enterprise Token (CI/CD)'));
+
+    // 6. Perform vf logout
     const logoutOut = runVf(['logout']);
     assert.ok(logoutOut.includes('Logged out from VectorForce Cloud'));
 
@@ -61,3 +78,4 @@ test('VectorForce Cloud CLI Auth: login, whoami, and logout', () => {
     try { rmSync(tempWs, { recursive: true, force: true }); } catch {}
   }
 });
+

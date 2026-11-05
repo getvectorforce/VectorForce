@@ -10,12 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.11] - 2026-11-06
 
 ### Added
-- **VectorForce Cloud CLI Authentication (`vf login`, `vf logout`, `vf whoami`)**:
-  - Developers can authenticate once with VectorForce Cloud via `vf login [subscription_key]`.
+- **Browser-Based SSO Login & Temporary Enterprise CI/CD Token System**:
+  - `vf login` launches a local loopback server (`127.0.0.1`) and automatically opens the user's browser to authenticate with legitimate credentials or enterprise subscription keys.
+  - Added seamless redirect callback handling (`/callback?key=...&state=...`) with cryptographic state nonce verification.
+  - Added temporary enterprise token generation via `vf token create [--ttl <hours>]` for headless CI/CD pipelines (GitHub Actions, GitLab CI, Docker).
+  - Headless CI/CD support: `vf login --token <TOKEN> --ci` bypasses browser opening completely.
   - Global authentication is persisted to `~/.vectorforce/config.json` (and `.vectorforce/config.json` locally when in a workspace).
   - `vf push` and `vf pull` now automatically resolve credentials hierarchically (`env` -> `local` -> `global` -> hosted cloud defaults) without requiring `--url` or `--key` flags.
   - Added `vf logout` to revoke/clear active cloud credentials.
-  - Added `vf whoami` to inspect the active cloud endpoint, masked subscription key, default project, and real-time cloud connection health/tier.
+  - Added `vf whoami` to inspect the active cloud endpoint, auth mode, masked subscription key, default project, and real-time cloud connection health/tier.
 
 ## [0.3.10] - 2026-11-05
 

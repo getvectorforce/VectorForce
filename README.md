@@ -188,21 +188,28 @@ node bin/vf.js checkpoint --task auth-module \
   --doc "AGENTS.md"
 ```
 
-### 5. Multi-Machine & Team Cloud Sync (`vf remote`, `vf push`, `vf pull`)
+### 5. Multi-Machine & Team Cloud Sync (`vf login`, `vf push`, `vf pull`)
 
 VectorForce follows the Git mental model for sharing context between two computers or across a team using Zero-Knowledge End-to-End Encryption (`X25519` + `AES-256-GCM` + `Ed25519`):
 
 ```bash
-# 1. Connect local workspace to your Cloud Remote once:
-node bin/vf.js remote set https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run \
-  --key vf_live_sub_98a7bc65f012e4d9 \
-  --project proj-bistro-pos
+# 1. Log into VectorForce Cloud once (saves to ~/.vectorforce/config.json):
+vf login vf_live_sub_98a7bc65f012e4d9
 
-# 2. Push local checkpoints & tasks to Cloud (E2EE):
-node bin/vf.js push
+# Or simply run interactive login:
+vf login
 
-# 3. Pull & reconcile context on Computer 2 (reconciles into SQLite & runs Meta Muse reasoning):
-node bin/vf.js pull
+# 2. Check active session, organization tier, and cloud endpoint:
+vf whoami
+
+# 3. Push local checkpoints & tasks to Cloud (E2EE):
+vf push
+
+# 4. Pull & reconcile context on Computer 2 (reconciles into SQLite & runs Meta Muse reasoning):
+vf pull
+
+# 5. Log out anytime:
+vf logout
 ```
 
 ### 6. Reason Over Context (AI Engineering Memory)

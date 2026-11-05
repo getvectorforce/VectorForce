@@ -147,6 +147,11 @@ VectorForce (vf) - Git for AI Engineering Context
 
 Usage:
   vf init [project_name] [--harness <id|all|none>]  Init workspace (auto-detects harnesses)
+  vf login [subscription_key]                Log into VectorForce Cloud (global session)
+  vf logout                                  Log out and clear active cloud session
+  vf whoami                                  Show active VectorForce Cloud session & tier
+  vf push [options]                          Push E2EE encrypted checkpoints to cloud
+  vf pull [options]                          Pull & decrypt cross-machine context
   vf task <id> [title]                       Create or register a task
   vf tasks [active|completed|all]            List tasks in workspace
   vf policy list                             List allowed document paths
@@ -164,6 +169,13 @@ Usage:
   vf mcp                                     Start stdio MCP server for Antigravity / Command Code
   vf config list|install|doctor               List, install, or check harness MCP integrations
   vf help                                    Show this help
+
+Cloud & Sync commands:
+  vf login [key]       Authenticate with VectorForce Cloud (interactive prompt or arg)
+  vf logout            Clear active cloud session
+  vf whoami            Show active session, endpoint, and subscription tier
+  vf push              Push checkpoints & context to cloud (uses saved session)
+  vf pull              Pull & decrypt context from cloud
 
 Checkpoint options:
   --task <id>          Task identifier
@@ -272,6 +284,10 @@ function parseFlags(args) {
       flags.workspace = resolve(args[++i]);
     } else if (arg === '--db' && args[i + 1]) {
       flags.db = resolve(args[++i]);
+    } else if (arg === '--dev' && args[i + 1]) {
+      flags.dev = args[++i];
+    } else if (arg === '--machine' && args[i + 1]) {
+      flags.machine = args[++i];
     } else if ((arg === '--url' || arg === '--remote') && args[i + 1]) {
       flags.url = args[++i];
     } else if (arg === '--key' && args[i + 1]) {
@@ -283,40 +299,125 @@ function parseFlags(args) {
   return flags;
 }
 
+const DEFAULT_CLOUD_URL = 'https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run';
+const DEFAULT_SUBSCRIPTION_KEY = 'vf_live_sub_98a7bc65f012e4d9';
+const DEFAULT_PROJECT_ID = 'proj-meta-e2ee';
+
+function getGlobalConfigDir() {
+  return join(homedir(), '.vectorforce');
+}
+
+function getGlobalConfigFile() {
+  return join(getGlobalConfigDir(), 'config.json');
+}
+
+function maskKey(key) {
+  if (!key) return '(none)';
+  if (key.length <= 8) return '****';
+  return `${key.slice(0, 12)}...${key.slice(-4)}`;
+}
+
 function getRemoteConfig(cwd) {
-  const defaultUrl = process.env.VF_CLOUD_URL || '';
-  const defaultKey = process.env.VF_SUBSCRIPTION_KEY || '';
-  const cfgPath = join(cwd, '.vectorforce', 'config.json');
+  const envUrl = process.env.VF_CLOUD_URL;
+  const envKey = process.env.VF_SUBSCRIPTION_KEY;
+  const envProj = process.env.VF_REMOTE_PROJECT;
+
+  let local = {};
+  if (cwd) {
+    try {
+      const cfgPath = join(cwd, '.vectorforce', 'config.json');
+      if (existsSync(cfgPath)) {
+        local = JSON.parse(readFileSync(cfgPath, 'utf8'));
+      }
+    } catch {}
+  }
+
+  let global = {};
   try {
-    if (existsSync(cfgPath)) {
-      const parsed = JSON.parse(readFileSync(cfgPath, 'utf8'));
-      return {
-        remoteUrl: (parsed.remoteUrl || defaultUrl).replace(/\/+$/, ''),
-        subscriptionKey: parsed.subscriptionKey || defaultKey,
-        remoteProjectId: parsed.remoteProjectId || 'default'
-      };
+    const globalPath = getGlobalConfigFile();
+    if (existsSync(globalPath)) {
+      global = JSON.parse(readFileSync(globalPath, 'utf8'));
     }
   } catch {}
+
+  const remoteUrl = (envUrl || local.remoteUrl || global.remoteUrl || DEFAULT_CLOUD_URL).replace(/\/+$/, '');
+  const subscriptionKey = envKey || local.subscriptionKey || global.subscriptionKey || DEFAULT_SUBSCRIPTION_KEY;
+  const remoteProjectId = envProj || local.remoteProjectId || global.remoteProjectId || DEFAULT_PROJECT_ID;
+
+  const hasExplicitAuth = Boolean(envKey || local.subscriptionKey || global.subscriptionKey);
+  const authSource = envKey ? 'env (VF_SUBSCRIPTION_KEY)' :
+    (local.subscriptionKey ? 'local (.vectorforce/config.json)' :
+    (global.subscriptionKey ? 'global (~/.vectorforce/config.json)' : 'default demo sandbox'));
+
   return {
-    remoteUrl: defaultUrl.replace(/\/+$/, ''),
-    subscriptionKey: defaultKey,
-    remoteProjectId: 'default'
+    remoteUrl,
+    subscriptionKey,
+    remoteProjectId,
+    hasExplicitAuth,
+    authSource
   };
 }
 
-function saveRemoteConfig(cwd, updates) {
-  const vfDir = join(cwd, '.vectorforce');
-  mkdirSync(vfDir, { recursive: true, mode: 0o700 });
-  const cfgPath = join(vfDir, 'config.json');
-  let existing = {};
+function saveRemoteConfig(cwd, updates = {}, options = {}) {
+  const { globalOnly = false, localOnly = false } = options;
+
+  let savedGlobal = {};
+  if (!localOnly) {
+    try {
+      const gDir = getGlobalConfigDir();
+      mkdirSync(gDir, { recursive: true, mode: 0o700 });
+      const gPath = getGlobalConfigFile();
+      let existing = {};
+      if (existsSync(gPath)) {
+        try { existing = JSON.parse(readFileSync(gPath, 'utf8')); } catch {}
+      }
+      savedGlobal = { ...existing, ...updates };
+      writeFileSync(gPath, JSON.stringify(savedGlobal, null, 2), 'utf8');
+    } catch {}
+  }
+
+  let savedLocal = {};
+  if (!globalOnly && cwd) {
+    try {
+      const vfDir = join(cwd, '.vectorforce');
+      mkdirSync(vfDir, { recursive: true, mode: 0o700 });
+      const cfgPath = join(vfDir, 'config.json');
+      let existing = {};
+      if (existsSync(cfgPath)) {
+        try { existing = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch {}
+      }
+      savedLocal = { ...existing, ...updates };
+      writeFileSync(cfgPath, JSON.stringify(savedLocal, null, 2), 'utf8');
+    } catch {}
+  }
+
+  return { ...savedGlobal, ...savedLocal };
+}
+
+function clearRemoteConfig(cwd) {
+  if (cwd) {
+    try {
+      const cfgPath = join(cwd, '.vectorforce', 'config.json');
+      if (existsSync(cfgPath)) {
+        const parsed = JSON.parse(readFileSync(cfgPath, 'utf8'));
+        delete parsed.subscriptionKey;
+        delete parsed.remoteUrl;
+        delete parsed.remoteProjectId;
+        writeFileSync(cfgPath, JSON.stringify(parsed, null, 2), 'utf8');
+      }
+    } catch {}
+  }
+
   try {
-    if (existsSync(cfgPath)) {
-      existing = JSON.parse(readFileSync(cfgPath, 'utf8'));
+    const gPath = getGlobalConfigFile();
+    if (existsSync(gPath)) {
+      const parsed = JSON.parse(readFileSync(gPath, 'utf8'));
+      delete parsed.subscriptionKey;
+      delete parsed.remoteUrl;
+      delete parsed.remoteProjectId;
+      writeFileSync(gPath, JSON.stringify(parsed, null, 2), 'utf8');
     }
   } catch {}
-  const merged = { ...existing, ...updates };
-  writeFileSync(cfgPath, JSON.stringify(merged, null, 2), 'utf8');
-  return merged;
 }
 
 async function main() {
@@ -330,6 +431,109 @@ async function main() {
 
   const flags = parseFlags(args.slice(1));
   const cwd = flags.workspace || getWorkspacePath(process.cwd());
+
+  if (command === 'logout') {
+    clearRemoteConfig(cwd);
+    console.log(`\n✔ Logged out from VectorForce Cloud.`);
+    console.log(`  Active session removed from ~/.vectorforce/config.json\n`);
+    process.exit(0);
+  }
+
+  if (command === 'whoami') {
+    const remote = getRemoteConfig(cwd);
+    console.log(`\nVectorForce Cloud Active Session:`);
+    console.log(`  Cloud Endpoint:   ${remote.remoteUrl}`);
+    console.log(`  Subscription Key: ${maskKey(remote.subscriptionKey)}`);
+    console.log(`  Default Project:  ${remote.remoteProjectId}`);
+    console.log(`  Auth Source:      ${remote.authSource}`);
+
+    try {
+      const res = await fetch(`${remote.remoteUrl}/api/cloud/overview?project=${encodeURIComponent(remote.remoteProjectId)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${remote.subscriptionKey}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const org = data.organization;
+        console.log(`  Session Status:   Active (HTTP 200 OK)`);
+        if (org?.name) {
+          console.log(`  Organization:     ${org.name} [Tier: ${org.subscription_tier || 'Enterprise Hub'}]`);
+        }
+      } else {
+        console.log(`  Session Status:   HTTP ${res.status} (${res.statusText})`);
+      }
+    } catch (err) {
+      console.log(`  Session Status:   Offline / Unreachable (${err.message})`);
+    }
+    console.log('');
+    process.exit(0);
+  }
+
+  if (command === 'login') {
+    const urlArg = flags.url || DEFAULT_CLOUD_URL;
+    let keyArg = args[1] && !args[1].startsWith('--') ? args[1] : (flags.key || '');
+    const projectArg = flags.project || DEFAULT_PROJECT_ID;
+
+    if (!keyArg && process.stdin.isTTY) {
+      try {
+        const readline = await import('node:readline/promises');
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        console.log(`\n☁️  VectorForce Cloud Authentication`);
+        console.log(`Connecting to endpoint: ${urlArg.replace(/\/+$/, '')}\n`);
+        const answer = await rl.question(`Enter Subscription Key [press Enter to use demo key]: `);
+        rl.close();
+        keyArg = answer.trim() || DEFAULT_SUBSCRIPTION_KEY;
+      } catch {
+        keyArg = DEFAULT_SUBSCRIPTION_KEY;
+      }
+    } else if (!keyArg) {
+      keyArg = DEFAULT_SUBSCRIPTION_KEY;
+    }
+
+    const targetUrl = urlArg.replace(/\/+$/, '');
+    console.log(`\n🔐 Verifying credentials with ${targetUrl} ...`);
+
+    let orgDetails = null;
+    try {
+      const res = await fetch(`${targetUrl}/api/cloud/overview?project=${encodeURIComponent(projectArg)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${keyArg}`
+        }
+      });
+      if (res.ok) {
+        orgDetails = await res.json();
+      } else if (res.status === 401 || res.status === 403) {
+        console.error(`❌ Authentication failed: HTTP ${res.status} Unauthorized.`);
+        console.error(`Please verify your subscription key at https://getvectorforce.github.io\n`);
+        process.exit(1);
+      }
+    } catch (fetchErr) {
+      console.warn(`⚠️  Warning: Unable to verify endpoint directly (${fetchErr.message}). Saving credentials locally.`);
+    }
+
+    saveRemoteConfig(cwd, {
+      remoteUrl: targetUrl,
+      subscriptionKey: keyArg,
+      remoteProjectId: projectArg
+    });
+
+    console.log(`✔ Logged in to VectorForce Cloud!`);
+    console.log(`  Cloud Endpoint:   ${targetUrl}`);
+    console.log(`  Subscription:     ${maskKey(keyArg)}`);
+    if (orgDetails?.organization?.name) {
+      console.log(`  Organization:     ${orgDetails.organization.name} (${orgDetails.organization.subscription_tier || 'Enterprise Hub'})`);
+    }
+    console.log(`  Default Project:  ${projectArg}`);
+    console.log(`  Saved Session:    ~/.vectorforce/config.json\n`);
+    console.log(`🚀 Ready! You can now run "vf push" and "vf pull" without passing --url or --key.`);
+    process.exit(0);
+  }
+
   const dbPath = flags.db || getDbPath(cwd);
   const { store, projectService, checkpointService, briefingService, handoffService, reasoningService, llmProviderError } = getServices(dbPath, cwd);
 
@@ -984,6 +1188,7 @@ VectorForce Harness Configuration:
         break;
       }
 
+
       case 'remote': {
         const sub = args[1] || 'show';
         if (sub === 'set' || sub === 'add') {
@@ -999,25 +1204,27 @@ VectorForce Harness Configuration:
           });
           console.log(`✔ Remote VectorForce Cloud configured in .vectorforce/config.json:`);
           console.log(`  Remote URL:  ${saved.remoteUrl}`);
-          console.log(`  Project ID:  ${saved.remoteProjectId || 'proj-bistro-pos'}`);
+          console.log(`  Project ID:  ${saved.remoteProjectId || DEFAULT_PROJECT_ID}`);
           break;
         }
         const remote = getRemoteConfig(cwd);
         console.log(`\nVectorForce Cloud Remote (${cwd}):`);
         console.log(`  Remote URL:       ${remote.remoteUrl}`);
         console.log(`  Remote Project:   ${remote.remoteProjectId}`);
-        console.log(`  Subscription Key: ${remote.subscriptionKey.slice(0, 12)}...`);
+        console.log(`  Subscription Key: ${maskKey(remote.subscriptionKey)}`);
+        console.log(`  Auth Source:      ${remote.authSource}`);
         break;
       }
 
       case 'push': {
         const remote = getRemoteConfig(cwd);
         const targetUrl = (flags.url || remote.remoteUrl).replace(/\/+$/, '');
-        if (!targetUrl) {
-          console.error('Error: Remote URL is not configured. Run "vf remote set <CLOUD_URL> --key <SUBSCRIPTION_KEY>" first.');
+        const subscriptionKey = flags.key || remote.subscriptionKey;
+        if (!targetUrl || !subscriptionKey) {
+          console.error('Error: Remote URL is not configured. Run "vf login" first.');
           process.exit(1);
         }
-        const remoteProjectId = flags.project || remote.remoteProjectId || 'default';
+        const remoteProjectId = flags.project || remote.remoteProjectId || DEFAULT_PROJECT_ID;
         const project = projectService.getProjectForWorkspace(cwd);
         const tasks = store.listTasks(project.project_id);
         const rawHost = hostname();
@@ -1036,7 +1243,7 @@ VectorForce Harness Configuration:
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${remote.subscriptionKey}`
+              Authorization: `Bearer ${subscriptionKey}`
             },
             body: JSON.stringify({
               projectId: remoteProjectId,
@@ -1061,7 +1268,7 @@ VectorForce Harness Configuration:
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${remote.subscriptionKey}`
+              Authorization: `Bearer ${subscriptionKey}`
             },
             body: JSON.stringify({
               projectId: remoteProjectId,
@@ -1095,18 +1302,19 @@ VectorForce Harness Configuration:
       case 'pull': {
         const remote = getRemoteConfig(cwd);
         const targetUrl = (flags.url || remote.remoteUrl).replace(/\/+$/, '');
-        if (!targetUrl) {
-          console.error('Error: Remote URL is not configured. Run "vf remote set <CLOUD_URL> --key <SUBSCRIPTION_KEY>" first.');
+        const subscriptionKey = flags.key || remote.subscriptionKey;
+        if (!targetUrl || !subscriptionKey) {
+          console.error('Error: Remote URL is not configured. Run "vf login" first.');
           process.exit(1);
         }
-        const remoteProjectId = flags.project || remote.remoteProjectId || 'default';
+        const remoteProjectId = flags.project || remote.remoteProjectId || DEFAULT_PROJECT_ID;
 
         console.log(`🔓 Pulling & Decrypting latest context from ${targetUrl} ...`);
         const res = await fetch(`${targetUrl}/api/cloud/sync/pull`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${remote.subscriptionKey}`
+            Authorization: `Bearer ${subscriptionKey}`
           },
           body: JSON.stringify({
             projectId: remoteProjectId,

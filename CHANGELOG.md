@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.11] - 2026-11-06
+
+### Added
+- **VectorForce Cloud CLI Authentication (`vf login`, `vf logout`, `vf whoami`)**:
+  - Developers can authenticate once with VectorForce Cloud via `vf login [subscription_key]`.
+  - Global authentication is persisted to `~/.vectorforce/config.json` (and `.vectorforce/config.json` locally when in a workspace).
+  - `vf push` and `vf pull` now automatically resolve credentials hierarchically (`env` -> `local` -> `global` -> hosted cloud defaults) without requiring `--url` or `--key` flags.
+  - Added `vf logout` to revoke/clear active cloud credentials.
+  - Added `vf whoami` to inspect the active cloud endpoint, masked subscription key, default project, and real-time cloud connection health/tier.
+
+## [0.3.10] - 2026-11-05
+
+### Added
+- **VectorForce Community & Hackathon Showcase**:
+  - Official high-resolution banner artwork added to README and website.
+  - Official video walkthrough and contest demo links integrated.
+  - Production verification across macOS, Linux, and Windows for multi-agent workflows.
+
 ## [0.3.9] - 2026-11-05
 
 ### Fixed

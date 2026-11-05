@@ -322,7 +322,7 @@ vf ui
 | :--- | :--- | :--- |
 | **GitHub Issues** | [github.com/getvectorforce/VectorForce/issues](https://github.com/getvectorforce/VectorForce/issues) | Bug reports, feature proposals, and RFCs |
 | **Documentation & Web** | [getvectorforce.github.io](https://getvectorforce.github.io) | Live documentation, installation guides, and blog |
-| **VectorForce Cloud Portal** | [VectorForce Cloud](https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run/login) | SSO Login, Project Switcher, and Team Dashboard |
+| **VectorForce Cloud Hub** | [Live Cloud Hub](https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run/?project=proj-meta-e2ee) | Interactive Project Switcher, Timeline, and Team Dashboard (use `vf login` for CLI SSO) |
 | **Video Walkthrough** | [YouTube Video (2m 21s)](https://youtu.be/Ufb_IjCU2l4) | End-to-end narrated architecture and demo |
 | **Social & Community** | [X / Twitter (@Vectorforce26)](https://x.com/Vectorforce26) • [LinkedIn](https://www.linkedin.com/company/vectorforce) | Announcements, hackathon updates, and community |
 

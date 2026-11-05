@@ -325,3 +325,4 @@ vf ui
 | **VectorForce Cloud Portal** | [VectorForce Cloud](https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run/login) | SSO Login, Project Switcher, and Team Dashboard |
 | **Video Walkthrough** | [YouTube Video (2m 21s)](https://youtu.be/Ufb_IjCU2l4) | End-to-end narrated architecture and demo |
 | **Social & Community** | [X / Twitter (@Vectorforce26)](https://x.com/Vectorforce26) • [LinkedIn](https://www.linkedin.com/company/vectorforce) | Announcements, hackathon updates, and community |
+

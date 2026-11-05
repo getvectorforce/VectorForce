@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.12] - 2026-11-06
+
+### Added
+- **Developer Support & Integration Documentation (`DEVELOPER_SUPPORT.md`)**:
+  - Comprehensive operational guide covering architecture invariants, installation, browser SSO login, headless CI/CD tokens, AI reasoning models, MCP harness configurations, and troubleshooting.
+  - Linked across repository README, official website, and cloud portal.
+- **Dynamic Version Synchronization & Cloud SSO on Official Website**:
+  - Website navigation bar and badges now automatically reflect the dynamic package version (`v0.3.12`) with real-time registry sync.
+  - Direct single sign-on link to VectorForce Cloud Login portal added to website navbar and hero CTA.
+
 ## [0.3.11] - 2026-11-06
 
 ### Added

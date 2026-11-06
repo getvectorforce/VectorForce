@@ -116,6 +116,8 @@ test('MCP: tools/list returns all required tools', async () => {
 
     assert.strictEqual(res.id, 10);
     const toolNames = res.result.tools.map(t => t.name);
+    assert.ok(toolNames.includes('create_task'));
+    assert.ok(toolNames.includes('update_task'));
     assert.ok(toolNames.includes('save_checkpoint'));
     assert.ok(toolNames.includes('get_resume_briefing'));
     assert.ok(toolNames.includes('list_tasks'));
@@ -220,6 +222,96 @@ test('MCP: End-to-end tool execution (save_checkpoint -> get_resume_briefing -> 
     const taskList = JSON.parse(listRes.result.content[0].text);
     assert.strictEqual(taskList.tasks.length, 1);
     assert.strictEqual(taskList.tasks[0].task_id, 'mcp-task');
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test('MCP: create_task, update_task, and hierarchical subtasks', async () => {
+  const fixture = createTestFixture();
+  try {
+    fixture.projectService.initProject(fixture.workspacePath);
+
+    const server = new McpServer({
+      store: fixture.store,
+      projectService: fixture.projectService,
+      checkpointService: fixture.checkpointService,
+      briefingService: fixture.briefingService
+    }, fixture.workspacePath);
+
+    const client = createMcpClient(server);
+
+    // 1. create_task (parent)
+    const createParentRes = await client.send({
+      jsonrpc: '2.0',
+      id: 201,
+      method: 'tools/call',
+      params: {
+        name: 'create_task',
+        arguments: {
+          task_id: 'feat-auth',
+          title: 'Authentication Feature'
+        }
+      }
+    });
+    assert.strictEqual(createParentRes.result.isError, false);
+    const parentData = JSON.parse(createParentRes.result.content[0].text);
+    assert.strictEqual(parentData.task.task_id, 'feat-auth');
+    assert.strictEqual(parentData.task.parent_task_id, null);
+
+    // 2. create_task (subtask linked to parent)
+    const createSubRes = await client.send({
+      jsonrpc: '2.0',
+      id: 202,
+      method: 'tools/call',
+      params: {
+        name: 'create_task',
+        arguments: {
+          task_id: 'feat-auth-sub-1',
+          title: 'Implement OAuth refresh token',
+          parent_task_id: 'feat-auth'
+        }
+      }
+    });
+    assert.strictEqual(createSubRes.result.isError, false);
+    const subData = JSON.parse(createSubRes.result.content[0].text);
+    assert.strictEqual(subData.task.task_id, 'feat-auth-sub-1');
+    assert.strictEqual(subData.task.parent_task_id, 'feat-auth');
+
+    // 3. update_task
+    const updateRes = await client.send({
+      jsonrpc: '2.0',
+      id: 203,
+      method: 'tools/call',
+      params: {
+        name: 'update_task',
+        arguments: {
+          task_id: 'feat-auth-sub-1',
+          status: 'completed'
+        }
+      }
+    });
+    assert.strictEqual(updateRes.result.isError, false);
+    const updatedData = JSON.parse(updateRes.result.content[0].text);
+    assert.strictEqual(updatedData.task.status, 'completed');
+
+    // 4. list_tasks filtered by parent_task_id
+    const listSubRes = await client.send({
+      jsonrpc: '2.0',
+      id: 204,
+      method: 'tools/call',
+      params: {
+        name: 'list_tasks',
+        arguments: {
+          status: 'all',
+          parent_task_id: 'feat-auth'
+        }
+      }
+    });
+    assert.strictEqual(listSubRes.result.isError, false);
+    const subList = JSON.parse(listSubRes.result.content[0].text);
+    assert.strictEqual(subList.tasks.length, 1);
+    assert.strictEqual(subList.tasks[0].task_id, 'feat-auth-sub-1');
   } finally {
     fixture.cleanup();
   }
@@ -405,6 +497,10 @@ test('HarnessConfig: Reversible GitHub Copilot installation and uninstall', () =
     const installedPath = HarnessConfig.installCopilot(fixture.workspacePath);
     assert.ok(existsSync(installedPath));
     assert.ok(existsSync(join(fixture.workspacePath, '.github', 'copilot-instructions.md')));
+    const instructions = readFileSync(join(fixture.workspacePath, '.github', 'copilot-instructions.md'), 'utf8');
+    assert.ok(instructions.includes('STRICT TOOL BOUNDARY & GUARDRAILS'));
+    assert.ok(instructions.includes('DO NOT read, search, or inspect VectorForce package internals'));
+    assert.ok(instructions.includes('create_task'));
 
     const config = JSON.parse(readFileSync(installedPath, 'utf8'));
     assert.strictEqual(config.servers.vectorforce.command, HarnessConfig.getNodeCommand());

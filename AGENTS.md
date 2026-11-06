@@ -35,45 +35,35 @@ This repository is the core workspace for **VectorForce** — a local-first, zer
 ## 2. Security & Policy Invariants
 
 - **Zero External Runtime Dependencies:** Core CLI, MCP server, and Studio backend use **only** Node.js built-ins (`node:sqlite`, `node:http`, `node:crypto`, `node:fs`, `node:child_process`).
-- **Claims vs Evidence Distinction:** Human/model inputs (`goals`, `constraints`, `decisions`, `next_steps`) are stored as unverifiable **`claims`**. Git commit SHAs, dirty states, and SHA-256 document digests are recorded as verifiable **`evidence`**.
-- **Strict Document Allowlist & Size Cap:** Only `.md`/`.txt` files in `node bin/vf.js policy list` (max `8 KiB` per file, `64 KiB` total) may be collected. `AGENTS.md` must stay `< 8192` bytes. Symlinks and path traversal (`..`) are strictly rejected.
+- **Strict Tool Boundary & Guardrails:** AI agents must **never** inspect, search, or edit `node_modules/vectorforce`, `bin/vf.js`, or package files. Operate strictly via MCP tools (`create_task`, `list_tasks`, `save_checkpoint`).
+- **Claims vs Evidence Distinction:** Model inputs (`goals`, `constraints`, `decisions`, `next_steps`) are stored as unverifiable **`claims`**. Git commit SHAs, dirty states, and SHA-256 document digests are verifiable **`evidence`**.
+- **Strict Document Allowlist & Size Cap:** Only `.md`/`.txt` files in `policy list` (max `8 KiB` per file, `64 KiB` total) may be collected. `AGENTS.md` must stay `< 8192` bytes. Symlinks and path traversal (`..`) are strictly rejected.
 - **Safe Receipts:** Receipts and audit logs never contain raw document bodies or API credentials.
 
 ---
 
-## 3. Workspace Directory & Module Map
+## 3. Workspace Directory Map
 
 ```text
 VectorForce/
 ├── AGENTS.md                      # Workspace guide & agent protocol (< 8 KiB)
 ├── README.md                      # Public documentation & quickstart
 ├── package.json                   # Zero-dependency ESM package (Node >= 22.5.0)
-├── bin/vf.js                      # Unified CLI (init, status, checkpoint, resume, reason, studio, mcp, handoff, config)
+├── bin/vf.js                      # Unified CLI (task, checkpoint, resume, reason, login)
 ├── src/
-│   ├── index.js                   # Public programmatic SDK exports
-│   ├── core/                      # errors.js, hash.js (SHA-256 / HMAC), types.js (schema validators)
-│   ├── policy/authorizer.js       # Workspace containment, symlink rejection, allowlist & harness auth
+│   ├── index.js                   # SDK exports
+│   ├── core/                      # errors.js, hash.js, types.js
+│   ├── policy/authorizer.js       # Workspace containment & allowlist auth
 │   ├── storage/sqlite-store.js    # Local SQLite WAL engine (.vectorforce/vectorforce.db)
-│   ├── providers/
-│   │   ├── code-index-provider.js # Zero-dep AST/symbol & dependency graph indexer
-│   │   ├── document-provider.js   # Policy-enforced doc reader & SHA-256 evidence collector
-│   │   ├── git-provider.js        # Git branch, HEAD SHA, dirty status, and file diff observer
-│   │   └── llm-provider.js        # AI adapter (Fireworks, Muse, OpenRouter, Ollama, OpenAI, Anthropic, BYOK)
-│   ├── operations/
-│   │   ├── project-service.js     # Project & task lifecycle + allowlist management
-│   │   ├── checkpoint-service.js  # Immutable checkpoint creation + evidence collection
-│   │   ├── briefing-service.js    # Cross-harness resume briefing + live Git/doc drift reconciliation
-│   │   ├── reasoning-service.js   # AI reasoning synthesis over checkpoints + code index + drift
-│   │   └── handoff-service.js     # HMAC-SHA256 signed handoff export/import + lineage verification
-│   ├── mcp/
-│   │   ├── mcp-server.js          # JSON-RPC 2.0 stdio MCP server (9 tools, 3 resources)
-│   │   └── harness-config.js      # Harness config generator (Antigravity, Cursor, Windsurf, Copilot, Kiro, Muse, Codex)
-│   └── studio/server.js           # Studio HTTP server (127.0.0.1:3210) + REST API
+│   ├── providers/                 # code-index, document, git, and llm-provider
+│   ├── operations/                # project, checkpoint, briefing, reasoning, handoff
+│   ├── mcp/                       # JSON-RPC MCP server (11 tools) & harness-config
+│   └── studio/server.js           # Studio HTTP server (127.0.0.1:3210) & REST API
 ├── studio/                        # React + Vite + Tailwind + XYFlow frontend
-├── samples/                       # Multi-agent workflows & integration samples
+├── samples/                       # Multi-agent workflows & samples
 ├── scripts/practical-test-env.js  # 7-stage practical E2E test
-├── test/                          # 79 automated unit, security, and MCP tests
-└── wiki/                          # Local-only ADRs and planning (gitignored)
+├── test/                          # Unit, security, and MCP tests
+└── wiki/                          # Local-only ADRs and planning
 ```
 
 ### Harness Configs (`vf init` / `vf config install`):
@@ -92,7 +82,9 @@ VectorForce/
 
 | MCP Tool (`src/mcp/mcp-server.js`) | Service Method | Purpose |
 | :--- | :--- | :--- |
-| `list_tasks` | `ProjectService.listTasks` | Discover active/completed tasks |
+| `create_task` | `ProjectService.createTask` | Create task or subtask (`parent_task_id`) |
+| `update_task` | `ProjectService.updateTaskStatus` | Update status (`active`/`completed`/`abandoned`) |
+| `list_tasks` | `ProjectService.listTasks` | Discover active/completed tasks & subtasks |
 | `save_checkpoint` | `CheckpointService.saveCheckpoint` | Commit claims + Git/doc evidence to SQLite |
 | `get_resume_briefing` | `BriefingService.generateBriefing` | Deterministic cross-harness briefing |
 | `check_workspace_drift` | `BriefingService.checkWorkspaceDrift` | Compare live Git & doc hashes vs checkpoint |

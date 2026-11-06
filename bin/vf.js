@@ -809,26 +809,78 @@ async function main() {
           console.log(`Task marked as completed: ${task.title} (${task.task_id}) [${task.status}]`);
           break;
         }
-        const isCreateSub = sub === 'create' || sub === 'add';
-        const rawArgs = isCreateSub ? args.slice(2) : args.slice(1);
+        if (sub === 'status' || sub === 'update') {
+          const taskId = args[2];
+          const newStatus = args[3];
+          if (!taskId || !newStatus) {
+            console.error('Error: task id and status required (e.g. vf task status feat-auth completed)');
+            process.exit(1);
+          }
+          const task = projectService.updateTaskStatus(cwd, taskId, newStatus);
+          console.log(`Task updated: ${task.title} (${task.task_id}) [${task.status}]`);
+          break;
+        }
+
+        // Support --parent <parent_id> flag for subtasks
+        let parentTaskId = null;
+        const filteredArgs = [];
+        for (let i = 0; i < args.length; i++) {
+          if (args[i] === '--parent') {
+            parentTaskId = args[i + 1] || null;
+            i++;
+          } else {
+            filteredArgs.push(args[i]);
+          }
+        }
+
+        const isCreateSub = filteredArgs[1] === 'create' || filteredArgs[1] === 'add';
+        const rawArgs = isCreateSub ? filteredArgs.slice(2) : filteredArgs.slice(1);
         const taskId = rawArgs[0];
         if (!taskId) {
           console.error('Error: task id required (e.g. vf task feat-sqlite "Implement SQLite store")');
           process.exit(1);
         }
         const title = rawArgs.slice(1).join(' ') || taskId;
-        const task = projectService.createTask(cwd, taskId, title);
-        console.log(`Task registered: ${task.title} (${task.task_id}) [${task.status}]`);
+        const task = projectService.createTask(cwd, taskId, title, parentTaskId);
+        const parentInfo = task.parent_task_id ? ` (subtask of ${task.parent_task_id})` : '';
+        console.log(`Task registered: ${task.title} (${task.task_id})${parentInfo} [${task.status}]`);
         break;
       }
 
       case 'tasks': {
         const filter = args[1] || 'active';
         const project = projectService.getProjectForWorkspace(cwd);
-        const tasks = store.listTasks(project.project_id, filter);
+        const allTasks = store.listTasks(project.project_id, filter);
         console.log(`Tasks for ${project.name} [${filter}]:`);
-        for (const t of tasks) {
+        if (allTasks.length === 0) {
+          console.log('  (no tasks found)');
+          break;
+        }
+        const subtasksByParent = new Map();
+        const rootTasks = [];
+        for (const t of allTasks) {
+          if (t.parent_task_id) {
+            if (!subtasksByParent.has(t.parent_task_id)) {
+              subtasksByParent.set(t.parent_task_id, []);
+            }
+            subtasksByParent.get(t.parent_task_id).push(t);
+          } else {
+            rootTasks.push(t);
+          }
+        }
+        for (const t of rootTasks) {
           console.log(`- [${t.status}] ${t.task_id}: ${t.title}`);
+          const subs = subtasksByParent.get(t.task_id) || [];
+          for (const s of subs) {
+            console.log(`  └─ [${s.status}] ${s.task_id}: ${s.title}`);
+          }
+        }
+        for (const [pId, subs] of subtasksByParent) {
+          if (!rootTasks.some(r => r.task_id === pId)) {
+            for (const s of subs) {
+              console.log(`- [${s.status}] ${s.task_id}: ${s.title} (parent: ${pId})`);
+            }
+          }
         }
         break;
       }

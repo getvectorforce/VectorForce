@@ -77,12 +77,38 @@ export const MCP_TOOLS = [
     }
   },
   {
+    name: 'create_task',
+    description: 'Create a new engineering task or subtask in the active workspace. Pass parent_task_id to register a hierarchical subtask.',
+    inputSchema: {
+      type: 'object',
+      required: ['task_id', 'title'],
+      properties: {
+        task_id: { type: 'string', description: 'Kebab-case task slug (e.g. auth-flow, auth-flow/token-refresh)' },
+        title: { type: 'string', description: 'Descriptive title of the task or subtask' },
+        parent_task_id: { type: 'string', description: 'Optional parent task ID to link as a subtask' }
+      }
+    }
+  },
+  {
+    name: 'update_task',
+    description: 'Update the status of an existing task or subtask.',
+    inputSchema: {
+      type: 'object',
+      required: ['task_id', 'status'],
+      properties: {
+        task_id: { type: 'string', description: 'Task identifier' },
+        status: { type: 'string', enum: ['active', 'completed', 'abandoned'], description: 'New status for the task' }
+      }
+    }
+  },
+  {
     name: 'list_tasks',
-    description: 'List engineering tasks registered in the active workspace.',
+    description: 'List engineering tasks and subtasks registered in the active workspace.',
     inputSchema: {
       type: 'object',
       properties: {
-        status: { type: 'string', enum: ['active', 'completed', 'abandoned', 'all'], default: 'active' }
+        status: { type: 'string', enum: ['active', 'completed', 'abandoned', 'all'], default: 'active' },
+        parent_task_id: { type: 'string', description: 'Optional filter to list subtasks under a specific parent task' }
       }
     }
   },
@@ -401,9 +427,50 @@ export class McpServer {
           break;
         }
 
+        case 'create_task': {
+          const task = this.projectService.createTask(
+            this.workspacePath,
+            args.task_id,
+            args.title,
+            args.parent_task_id || null
+          );
+          this._sendResult(id, {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({ status: 'created', task }, null, 2)
+              }
+            ],
+            isError: false
+          });
+          break;
+        }
+
+        case 'update_task': {
+          const task = this.projectService.updateTaskStatus(
+            this.workspacePath,
+            args.task_id,
+            args.status
+          );
+          this._sendResult(id, {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({ status: 'updated', task }, null, 2)
+              }
+            ],
+            isError: false
+          });
+          break;
+        }
+
         case 'list_tasks': {
           const project = this.projectService.getProjectForWorkspace(this.workspacePath);
-          const tasks = this.store.listTasks(project.project_id, args.status || 'active');
+          const tasks = this.store.listTasks(
+            project.project_id,
+            args.status || 'active',
+            args.parent_task_id !== undefined ? args.parent_task_id : undefined
+          );
           this._sendResult(id, {
             content: [
               {

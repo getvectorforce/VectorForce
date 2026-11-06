@@ -848,7 +848,7 @@ export class HarnessConfig {
     if (!existsSync(cursorRulesPath)) {
       writeFileSync(
         cursorRulesPath,
-        `# VectorForce Agent Protocol (Cursor)\n\nThis workspace uses VectorForce for architectural continuity and drift verification.\n- Check active tasks & drift: Use MCP tools 'list_tasks' & 'check_workspace_drift'\n- Retrieve briefing: Use MCP tool 'get_resume_briefing'\n- Save checkpoint: Use MCP tool 'save_checkpoint'\n`,
+        `# VectorForce Agent Protocol (Cursor)\n\nThis workspace uses VectorForce for architectural continuity and drift verification.\n\n## STRICT TOOL BOUNDARY & GUARDRAILS (MANDATORY)\n1. DO NOT inspect or read VectorForce package code: Never search, open, or decompile files inside \`node_modules/vectorforce/\`, \`bin/vf.js\`, \`src/\`, or \`.vectorforce/\` to inspect internal commands.\n2. DO NOT modify VectorForce source code or storage: Never edit \`node_modules/vectorforce/\` or \`.vectorforce/vectorforce.db\` directly.\n3. Task & Subtask Protocol: Use MCP 'create_task' (pass 'parent_task_id' for subtasks), 'update_task', and 'list_tasks'.\n4. Checkpoints & Drift: Use MCP 'save_checkpoint', 'get_resume_briefing', and 'check_workspace_drift'.\n`,
         'utf8'
       );
     }
@@ -973,7 +973,7 @@ export class HarnessConfig {
     if (!existsSync(windsurfRulesPath)) {
       writeFileSync(
         windsurfRulesPath,
-        `# VectorForce Agent Protocol (Windsurf Cascade)\n\nThis workspace uses VectorForce for architectural continuity and drift verification.\n- Check tasks & drift: Call MCP tools 'list_tasks' and 'check_workspace_drift'\n- Resume briefing: Call MCP tool 'get_resume_briefing'\n- Save checkpoint: Call MCP tool 'save_checkpoint'\n`,
+        `# VectorForce Agent Protocol (Windsurf Cascade)\n\nThis workspace uses VectorForce for architectural continuity and drift verification.\n\n## STRICT TOOL BOUNDARY & GUARDRAILS (MANDATORY)\n1. DO NOT inspect or read VectorForce package code: Never search, open, or decompile files inside \`node_modules/vectorforce/\`, \`bin/vf.js\`, \`src/\`, or \`.vectorforce/\` to inspect internal commands.\n2. DO NOT modify VectorForce source code or storage: Never edit \`node_modules/vectorforce/\` or \`.vectorforce/vectorforce.db\` directly.\n3. Task & Subtask Protocol: Use MCP 'create_task' (pass 'parent_task_id' for subtasks), 'update_task', and 'list_tasks'.\n4. Checkpoints & Drift: Use MCP 'save_checkpoint', 'get_resume_briefing', and 'check_workspace_drift'.\n`,
         'utf8'
       );
     }
@@ -1115,7 +1115,7 @@ export class HarnessConfig {
     if (!existsSync(copilotMdPath)) {
       writeFileSync(
         copilotMdPath,
-        `# VectorForce Context Protocol (GitHub Copilot)\n\nThis workspace uses VectorForce for architectural continuity and drift protection.\n- Architectural decisions (ADRs) and invariant constraints are tracked in VectorForce.\n- Check tasks and drift via VectorForce MCP or \`node bin/vf.js drift\`.\n- Always capture progress with \`node bin/vf.js checkpoint\`.\n`,
+        `# VectorForce Context Protocol (GitHub Copilot)\n\nThis workspace uses VectorForce for architectural continuity and drift protection.\n\n## STRICT TOOL BOUNDARY & GUARDRAILS (MANDATORY)\n1. DO NOT read, search, or inspect VectorForce package internals:\n   - Strictly DO NOT search, open, read, or decompile files inside \`node_modules/vectorforce/\`, \`bin/vf.js\`, \`src/\`, or \`.vectorforce/\` to inspect internal command implementations or search for task code.\n   - VectorForce is a managed tool platform accessed strictly via its MCP tools or standard CLI commands.\n2. DO NOT modify VectorForce source code or storage:\n   - Strictly DO NOT edit files in \`node_modules/vectorforce/\`, the VectorForce \`package.json\`, or the SQLite database (\`.vectorforce/vectorforce.db\`) directly.\n3. Task & Subtask Management Protocol:\n   - To create a task or subtask: Call the MCP \`create_task\` tool (pass \`parent_task_id\` for hierarchical subtasks).\n   - To update task status: Call the MCP \`update_task\` tool (\`active\`, \`completed\`, \`abandoned\`).\n   - To list tasks/subtasks: Call the MCP \`list_tasks\` tool.\n   - If a requested tool capability is unavailable, report it to the user. DO NOT attempt to inspect the source code to find hidden commands.\n4. Context & Checkpoints:\n   - Check drift: Call MCP \`check_workspace_drift\`.\n   - Retrieve briefing: Call MCP \`get_resume_briefing\`.\n   - Commit progress: Call MCP \`save_checkpoint\`.\n`,
         'utf8'
       );
     }
@@ -1253,7 +1253,7 @@ export class HarnessConfig {
     if (!existsSync(steeringPath)) {
       writeFileSync(
         steeringPath,
-        `# VectorForce Agent Steering (Kiro IDE)\n\nThis workspace uses VectorForce for architectural continuity and drift prevention.\n- Use VectorForce MCP tools: 'list_tasks', 'check_workspace_drift', 'get_resume_briefing', 'save_checkpoint'.\n- Strictly adhere to invariant constraints and architectural decisions.\n`,
+        `# VectorForce Agent Steering (Kiro IDE)\n\nThis workspace uses VectorForce for architectural continuity and drift prevention.\n\n## STRICT TOOL BOUNDARY & GUARDRAILS (MANDATORY)\n1. DO NOT inspect or read VectorForce package code: Never search, open, or decompile files inside \`node_modules/vectorforce/\`, \`bin/vf.js\`, \`src/\`, or \`.vectorforce/\` to inspect internal commands.\n2. DO NOT modify VectorForce source code or storage: Never edit \`node_modules/vectorforce/\` or \`.vectorforce/vectorforce.db\` directly.\n3. Task & Subtask Protocol: Use MCP 'create_task' (pass 'parent_task_id' for subtasks), 'update_task', and 'list_tasks'.\n4. Checkpoints & Drift: Use MCP 'save_checkpoint', 'get_resume_briefing', and 'check_workspace_drift'.\n`,
         'utf8'
       );
     }

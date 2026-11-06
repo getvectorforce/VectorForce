@@ -81,20 +81,22 @@ export class ProjectService {
    * @param {string} workspacePath
    * @param {string} taskId Kebab-case slug
    * @param {string} title
+   * @param {string|null} [parentTaskId]
    */
-  createTask(workspacePath, taskId, title) {
+  createTask(workspacePath, taskId, title, parentTaskId = null) {
     const project = this.getProjectForWorkspace(workspacePath);
-    return this.store.createTask(project.project_id, taskId, title);
+    return this.store.createTask(project.project_id, taskId, title, parentTaskId);
   }
 
   /**
    * List tasks for a workspace.
    * @param {string} workspacePath
    * @param {'active' | 'archived' | 'all'} [status]
+   * @param {string|null} [parentTaskId]
    */
-  listTasks(workspacePath, status = 'all') {
+  listTasks(workspacePath, status = 'all', parentTaskId = undefined) {
     const project = this.getProjectForWorkspace(workspacePath);
-    return this.store.listTasks(project.project_id, status);
+    return this.store.listTasks(project.project_id, status, parentTaskId);
   }
 
   /**

@@ -37,6 +37,7 @@ export class SqliteStore {
         project_id TEXT NOT NULL,
         title TEXT NOT NULL,
         status TEXT NOT NULL CHECK(status IN ('active', 'completed', 'abandoned')),
+        parent_task_id TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         PRIMARY KEY (project_id, task_id),
@@ -81,6 +82,13 @@ export class SqliteStore {
         FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
       );
     `);
+
+    try {
+      const taskCols = this.db.prepare("PRAGMA table_info(tasks)").all();
+      if (!taskCols.some(c => c.name === 'parent_task_id')) {
+        this.db.exec('ALTER TABLE tasks ADD COLUMN parent_task_id TEXT;');
+      }
+    } catch {}
   }
 
   close() {
@@ -109,7 +117,7 @@ export class SqliteStore {
     return this.db.prepare('SELECT * FROM projects WHERE project_id = ?').get(projectId) || null;
   }
 
-  createTask(projectId, taskId, title) {
+  createTask(projectId, taskId, title, parentTaskId = null) {
     const project = this.getProjectById(projectId);
     if (!project) {
       throw new VectorForceError(ErrorCode.PROJECT_NOT_INITIALIZED, `Project ${projectId} does not exist`);
@@ -120,11 +128,17 @@ export class SqliteStore {
     if (existing) {
       return existing;
     }
+    if (parentTaskId) {
+      const parent = this.getTask(projectId, parentTaskId);
+      if (!parent) {
+        throw new VectorForceError(ErrorCode.TASK_NOT_FOUND, `Parent task ${parentTaskId} not found in project ${projectId}`);
+      }
+    }
     const now = new Date().toISOString();
     this.db.prepare(
-      'INSERT INTO tasks (task_id, project_id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(taskId, projectId, title, 'active', now, now);
-    return { task_id: taskId, project_id: projectId, title, status: 'active', created_at: now, updated_at: now };
+      'INSERT INTO tasks (task_id, project_id, title, status, parent_task_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(taskId, projectId, title, 'active', parentTaskId || null, now, now);
+    return { task_id: taskId, project_id: projectId, title, status: 'active', parent_task_id: parentTaskId || null, created_at: now, updated_at: now };
   }
 
   getTask(projectId, taskId) {
@@ -133,15 +147,23 @@ export class SqliteStore {
     ).get(projectId, taskId) || null;
   }
 
-  listTasks(projectId, status = null) {
+  listTasks(projectId, status = null, parentTaskId = undefined) {
+    let sql = 'SELECT * FROM tasks WHERE project_id = ?';
+    const params = [projectId];
     if (status && status !== 'all') {
-      return this.db.prepare(
-        'SELECT * FROM tasks WHERE project_id = ? AND status = ? ORDER BY updated_at DESC'
-      ).all(projectId, status);
+      sql += ' AND status = ?';
+      params.push(status);
     }
-    return this.db.prepare(
-      'SELECT * FROM tasks WHERE project_id = ? ORDER BY updated_at DESC'
-    ).all(projectId);
+    if (parentTaskId !== undefined) {
+      if (parentTaskId === null) {
+        sql += ' AND parent_task_id IS NULL';
+      } else {
+        sql += ' AND parent_task_id = ?';
+        params.push(parentTaskId);
+      }
+    }
+    sql += ' ORDER BY updated_at DESC';
+    return this.db.prepare(sql).all(...params);
   }
 
   updateTaskStatus(projectId, taskId, status) {

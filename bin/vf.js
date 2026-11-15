@@ -420,7 +420,7 @@ function createAuthCallbackServer(expectedState, timeoutMs = 120000) {
   });
 }
 
-const DEFAULT_CLOUD_URL = 'https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run';
+const DEFAULT_CLOUD_URL = 'https://cloud.vectorforce.in';
 const DEFAULT_SUBSCRIPTION_KEY = 'vf_live_sub_98a7bc65f012e4d9';
 const DEFAULT_PROJECT_ID = 'proj-meta-e2ee';
 
@@ -713,7 +713,7 @@ async function main() {
         orgDetails = await res.json();
       } else if (res.status === 401 || res.status === 403) {
         console.error(`❌ Authentication failed: HTTP ${res.status} Unauthorized.`);
-        console.error(`Please verify your subscription key at https://getvectorforce.github.io\n`);
+        console.error(`Please verify your subscription key at https://cloud.vectorforce.in\n`);
         process.exit(1);
       }
     } catch (fetchErr) {

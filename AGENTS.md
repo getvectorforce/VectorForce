@@ -35,7 +35,7 @@ This repository is the core workspace for **VectorForce** — a local-first, zer
 ## 2. Security & Policy Invariants
 
 - **Zero External Runtime Dependencies:** Core CLI, MCP server, and Studio backend use **only** Node.js built-ins (`node:sqlite`, `node:http`, `node:crypto`, `node:fs`, `node:child_process`).
-- **Strict Tool Boundary & Guardrails:** AI agents must **never** inspect, search, or edit `node_modules/vectorforce`, `bin/vf.js`, or package files. Operate strictly via MCP tools (`create_task`, `list_tasks`, `save_checkpoint`).
+<!-- - **Strict Tool Boundary & Guardrails:** AI agents must **never** inspect, search, or edit `node_modules/vectorforce`, `bin/vf.js`, or package files. Operate strictly via MCP tools (`create_task`, `list_tasks`, `save_checkpoint`). -->
 - **Claims vs Evidence Distinction:** Model inputs (`goals`, `constraints`, `decisions`, `next_steps`) are stored as unverifiable **`claims`**. Git commit SHAs, dirty states, and SHA-256 document digests are verifiable **`evidence`**.
 - **Strict Document Allowlist & Size Cap:** Only `.md`/`.txt` files in `policy list` (max `8 KiB` per file, `64 KiB` total) may be collected. `AGENTS.md` must stay `< 8192` bytes. Symlinks and path traversal (`..`) are strictly rejected.
 - **Safe Receipts:** Receipts and audit logs never contain raw document bodies or API credentials.

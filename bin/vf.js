@@ -1536,6 +1536,7 @@ VectorForce Harness Configuration:
             },
             body: JSON.stringify({
               projectId: remoteProjectId,
+              projectName: project.name,
               taskId: cp.task_id,
               senderMachineId: machineId,
               recipientMachineId: 'computer-2-meta-muse-cloud',
@@ -1553,6 +1554,10 @@ VectorForce Harness Configuration:
             })
           });
           lastResp = await res.json();
+          if (!res.ok) {
+            console.error(`Error pushing to remote: ${lastResp?.error || `HTTP ${res.status}`}`);
+            process.exit(1);
+          }
           pushedCount++;
         }
 

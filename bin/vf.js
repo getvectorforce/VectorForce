@@ -421,8 +421,6 @@ function createAuthCallbackServer(expectedState, timeoutMs = 120000) {
 }
 
 const DEFAULT_CLOUD_URL = 'https://cloud.vectorforce.in';
-const DEFAULT_SUBSCRIPTION_KEY = 'vf_live_sub_98a7bc65f012e4d9';
-const DEFAULT_PROJECT_ID = 'proj-meta-e2ee';
 
 function getGlobalConfigDir() {
   return join(homedir(), '.vectorforce');
@@ -462,13 +460,13 @@ function getRemoteConfig(cwd) {
   } catch {}
 
   const remoteUrl = (envUrl || local.remoteUrl || global.remoteUrl || DEFAULT_CLOUD_URL).replace(/\/+$/, '');
-  const subscriptionKey = envKey || local.subscriptionKey || global.subscriptionKey || DEFAULT_SUBSCRIPTION_KEY;
-  const remoteProjectId = envProj || local.remoteProjectId || global.remoteProjectId || DEFAULT_PROJECT_ID;
+  const subscriptionKey = envKey || local.subscriptionKey || global.subscriptionKey || null;
+  const remoteProjectId = envProj || local.remoteProjectId || global.remoteProjectId || null;
 
   const hasExplicitAuth = Boolean(envKey || local.subscriptionKey || global.subscriptionKey);
   const authSource = envKey ? 'env (VF_SUBSCRIPTION_KEY)' :
     (local.subscriptionKey ? 'local (.vectorforce/config.json)' :
-    (global.subscriptionKey ? 'global (~/.vectorforce/config.json)' : 'default demo sandbox'));
+    (global.subscriptionKey ? 'global (~/.vectorforce/config.json)' : 'not logged in'));
 
   return {
     remoteUrl,
@@ -595,13 +593,19 @@ async function main() {
     const isTemp = remote.subscriptionKey?.startsWith('vf_temp_') || remote.subscriptionKey?.startsWith('vf_ci_');
     console.log(`\nVectorForce Cloud Active Session:`);
     console.log(`  Cloud Endpoint:   ${remote.remoteUrl}`);
-    console.log(`  Auth Mode:        ${isTemp ? 'Temporary Enterprise Token (CI/CD)' : 'Enterprise Subscription Key'}`);
+    console.log(`  Auth Mode:        ${!remote.subscriptionKey ? 'Not authenticated' : (isTemp ? 'Temporary Enterprise Token (CI/CD)' : 'Enterprise Subscription Key')}`);
     console.log(`  Subscription Key: ${maskKey(remote.subscriptionKey)}`);
-    console.log(`  Default Project:  ${remote.remoteProjectId}`);
+    console.log(`  Default Project:  ${remote.remoteProjectId || '(none)'}`);
     console.log(`  Auth Source:      ${remote.authSource}`);
 
+    if (!remote.subscriptionKey) {
+      console.log(`  Session Status:   Not logged in (run "vf login")\n`);
+      process.exit(0);
+    }
+
     try {
-      const res = await fetch(`${remote.remoteUrl}/api/cloud/overview?project=${encodeURIComponent(remote.remoteProjectId)}`, {
+      const projQuery = remote.remoteProjectId ? `?project=${encodeURIComponent(remote.remoteProjectId)}` : '';
+      const res = await fetch(`${remote.remoteUrl}/api/cloud/overview${projQuery}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -627,7 +631,7 @@ async function main() {
 
   if (command === 'login') {
     const urlArg = flags.url || DEFAULT_CLOUD_URL;
-    const projectArg = flags.project || DEFAULT_PROJECT_ID;
+    const projectArg = flags.project || '';
     const targetUrl = urlArg.replace(/\/+$/, '');
 
     const directToken = flags.token || flags.key || (args[1] && !args[1].startsWith('--') ? args[1] : null);
@@ -681,21 +685,21 @@ async function main() {
           try {
             const readline = await import('node:readline/promises');
             const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-            const answer = await rl.question(`Enter Subscription Key [press Enter for demo key]: `);
+            const answer = await rl.question(`Enter Subscription Key or API Token: `);
             rl.close();
-            keyArg = answer.trim() || DEFAULT_SUBSCRIPTION_KEY;
+            keyArg = answer.trim() || null;
             authMethod = 'manual-prompt';
           } catch {
-            keyArg = DEFAULT_SUBSCRIPTION_KEY;
+            keyArg = null;
           }
-        } else {
-          keyArg = DEFAULT_SUBSCRIPTION_KEY;
         }
       }
     }
 
     if (!keyArg) {
-      keyArg = DEFAULT_SUBSCRIPTION_KEY;
+      console.error('\n❌ No subscription key or API token provided.');
+      console.error('Run "vf login" to authenticate via browser or pass "vf login --token <KEY>".\n');
+      process.exit(1);
     }
 
     console.log(`\n🔐 Verifying credentials with ${targetUrl} ...`);
@@ -1464,13 +1468,13 @@ VectorForce Harness Configuration:
           });
           console.log(`✔ Remote VectorForce Cloud configured in .vectorforce/config.json:`);
           console.log(`  Remote URL:  ${saved.remoteUrl}`);
-          console.log(`  Project ID:  ${saved.remoteProjectId || DEFAULT_PROJECT_ID}`);
+          console.log(`  Project ID:  ${saved.remoteProjectId || '(none)'}`);
           break;
         }
         const remote = getRemoteConfig(cwd);
         console.log(`\nVectorForce Cloud Remote (${cwd}):`);
         console.log(`  Remote URL:       ${remote.remoteUrl}`);
-        console.log(`  Remote Project:   ${remote.remoteProjectId}`);
+        console.log(`  Remote Project:   ${remote.remoteProjectId || '(none)'}`);
         console.log(`  Subscription Key: ${maskKey(remote.subscriptionKey)}`);
         console.log(`  Auth Source:      ${remote.authSource}`);
         break;
@@ -1484,8 +1488,8 @@ VectorForce Harness Configuration:
           console.error('Error: Remote URL is not configured. Run "vf login" first.');
           process.exit(1);
         }
-        const remoteProjectId = flags.project || remote.remoteProjectId || DEFAULT_PROJECT_ID;
         const project = projectService.getProjectForWorkspace(cwd);
+        const remoteProjectId = flags.project || remote.remoteProjectId || project.project_id;
         const tasks = store.listTasks(project.project_id);
         const rawHost = hostname();
         const machineId = flags.machine || (
@@ -1567,7 +1571,7 @@ VectorForce Harness Configuration:
           console.error('Error: Remote URL is not configured. Run "vf login" first.');
           process.exit(1);
         }
-        const remoteProjectId = flags.project || remote.remoteProjectId || DEFAULT_PROJECT_ID;
+        const remoteProjectId = flags.project || remote.remoteProjectId || projectService.getProjectForWorkspace(cwd).project_id;
 
         console.log(`🔓 Pulling & Decrypting latest context from ${targetUrl} ...`);
         const res = await fetch(`${targetUrl}/api/cloud/sync/pull`, {

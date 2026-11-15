@@ -102,7 +102,7 @@ vf login
 
 1. The CLI launches an ephemeral loopback server on `127.0.0.1:<PORT>`.
 2. Automatically opens your default browser to the VectorForce Cloud login portal:
-   `https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run/login`
+   `https://cloud.vectorforce.in/login`
 3. Enter your enterprise credentials or subscription key and click **Authorize**.
 4. The cloud redirects back to `http://127.0.0.1:<PORT>/callback?key=...&state=...`.
 5. The CLI validates the state nonce, commits the session to `~/.vectorforce/config.json`, and finishes.
@@ -141,7 +141,7 @@ vf whoami
 Output:
 ```text
 VectorForce Cloud Active Session:
-  Cloud Endpoint:   https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run
+  Cloud Endpoint:   https://cloud.vectorforce.in
   Auth Mode:        Enterprise Subscription Key
   Subscription Key: vf_live_sub_...e4d9
   Default Project:  proj-meta-e2ee
@@ -322,7 +322,7 @@ vf ui
 | :--- | :--- | :--- |
 | **GitHub Issues** | [github.com/getvectorforce/VectorForce/issues](https://github.com/getvectorforce/VectorForce/issues) | Bug reports, feature proposals, and RFCs |
 | **Documentation & Web** | [getvectorforce.github.io](https://getvectorforce.github.io) | Live documentation, installation guides, and blog |
-| **VectorForce Cloud Hub** | [Live Cloud Hub](https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run/?project=proj-meta-e2ee) | Interactive Project Switcher, Timeline, and Team Dashboard (use `vf login` for CLI SSO) |
+| **VectorForce Cloud Hub** | [Live Cloud Hub](https://cloud.vectorforce.in/?project=proj-meta-e2ee) | Interactive Project Switcher, Timeline, and Team Dashboard (use `vf login` for CLI SSO) |
 | **Video Walkthrough** | [YouTube Video (2m 21s)](https://youtu.be/Ufb_IjCU2l4) | End-to-end narrated architecture and demo |
 | **Social & Community** | [X / Twitter (@Vectorforce26)](https://x.com/Vectorforce26) • [LinkedIn](https://www.linkedin.com/company/vectorforce) | Announcements, hackathon updates, and community |
 

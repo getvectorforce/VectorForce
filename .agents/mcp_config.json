@@ -9,7 +9,7 @@
       ]
     },
     "vectorforce-cloud": {
-      "serverUrl": "https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.us-east.modal.run/v1/sse",
+      "serverUrl": "https://cloud.vectorforce.in/v1/mcp/sse",
       "headers": {
         "Authorization": "Bearer vf_live_sub_98a7bc65f012e4d9"
       }

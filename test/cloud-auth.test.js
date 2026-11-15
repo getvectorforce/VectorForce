@@ -14,7 +14,7 @@ test('VectorForce Cloud CLI Auth: login, whoami, and logout', () => {
     ...process.env,
     HOME: tempHome,
     VF_WORKSPACE: tempWs,
-    VF_CLOUD_URL: 'https://omprakash-pce2011--vectorforce-cloud-vectorforce-cloud-web.modal.run'
+    VF_CLOUD_URL: 'https://cloud.vectorforce.in'
   };
 
   const runVf = (args) => {
